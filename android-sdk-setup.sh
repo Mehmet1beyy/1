@@ -6,7 +6,20 @@
 set -euo pipefail
 
 # --- Ayarlanabilir surumler ---
-ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
+# ANDROID_HOME mutlak bir yol OLMALI. Ortam degiskeni olarak goreli bir deger
+# (orn. baslangic '/' eksik: "root/android-sdk") gelirse, cwd'ye gore yanlis
+# yere cozulur. Bu yuzden set edilmemis ya da goreli ise mutlak varsayilana
+# dusuyoruz.
+DEFAULT_ANDROID_HOME="$HOME/android-sdk"
+case "${ANDROID_HOME:-}" in
+  /*) : ;;  # zaten mutlak, oldugu gibi kullan
+  "") ANDROID_HOME="$DEFAULT_ANDROID_HOME" ;;
+  *)
+    echo "==> UYARI: ANDROID_HOME goreli bir yol ('$ANDROID_HOME'); " \
+         "mutlak varsayilana ayarlaniyor: $DEFAULT_ANDROID_HOME" >&2
+    ANDROID_HOME="$DEFAULT_ANDROID_HOME"
+    ;;
+esac
 CMDLINE_TOOLS_ZIP="commandlinetools-linux-11076708_latest.zip"
 BUILD_TOOLS_VERSION="35.0.0"
 PLATFORM_VERSION="android-35"
@@ -34,8 +47,22 @@ else
   echo "==> cmdline-tools zaten kurulu, atlaniyor."
 fi
 
+# Yardimci: "yes | sdkmanager" boru hatti, sdkmanager stdin'i erken kapatinca
+# `yes`'e SIGPIPE gonderir (exit 141). `set -o pipefail` altinda bu, gercek bir
+# hata olmadigi halde betigi oldurur. Bu sarmalayici pipefail'i yalnizca bu
+# cagri icin kapatir; boylece pipeline durumu `yes`'in degil, sdkmanager'in
+# gercek cikis kodu olur.
+sdkm_run() {
+  local rc
+  set +o pipefail
+  yes 2>/dev/null | "$SDKM" "$@"
+  rc=$?
+  set -o pipefail
+  return "$rc"
+}
+
 # 2) Lisanslari kabul et (sessiz)
-yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+sdkm_run --licenses >/dev/null 2>&1 || true
 
 # 3) Gerekli paketler kurulu degilse kur
 need_install=0
@@ -45,7 +72,7 @@ done
 
 if [ "$need_install" -eq 1 ]; then
   echo "==> SDK paketleri kuruluyor..."
-  yes | "$SDKM" \
+  sdkm_run \
     "platform-tools" \
     "build-tools;${BUILD_TOOLS_VERSION}" \
     "platforms;${PLATFORM_VERSION}" >/dev/null
