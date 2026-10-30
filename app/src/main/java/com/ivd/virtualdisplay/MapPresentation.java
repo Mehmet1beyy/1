@@ -131,6 +131,22 @@ public class MapPresentation extends Presentation {
         }
     }
 
+    /**
+     * Ana uygulamadaki önizlemeden iletilen dokunma olayını, sanal ekrandaki
+     * haritaya (MapView) doğrudan uygular. Koordinatlar çağrı yapan tarafından
+     * sanal ekran piksel uzayına (1280x720) ölçeklenmiş olarak gelir.
+     * Ana iş parçacığında çağrılır.
+     */
+    public void dispatchMapTouch(android.view.MotionEvent ev) {
+        try {
+            if (mapView != null && ev != null) {
+                mapView.dispatchTouchEvent(ev);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "dispatchMapTouch hatası", t);
+        }
+    }
+
     @Override
     public void dismiss() {
         // Kaynakları düzgün serbest bırak.

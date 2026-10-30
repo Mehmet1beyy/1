@@ -24,6 +24,13 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
   artmaya devam eder).
 - **Yakınlaştırma/uzaklaştırma:** ana uygulamadaki `+` / `−` düğmeleri, bağlı
   servis üzerinden sanal ekrandaki haritanın zoom'unu kontrol eder.
+- **Dokunmatik kontrol (önizleme üzerinden):** ana uygulamadaki önizlemeye
+  dokunulduğunda olay, sanal ekranın piksel uzayına (1280×720) ölçeklenip
+  `MotionEvent` olarak **aynı haritaya** iletilir. Böylece tek parmakla kaydırma,
+  çift dokunmayla yakınlaştırma, iki parmakla pinch-to-zoom ve basılı tutma
+  doğrudan sanal ekrandaki `MapView` tarafından işlenir — ana uygulamada ayrı
+  bir harita yoktur. `fitCenter` harf kutusu ofseti hesaba katılır; olaylar hafif
+  olduğundan arayüz kilitlenmez (ScrollView'in olayı ele geçirmesi engellenir).
 - **Çevrimdışı dayanıklılık:** harita kurulumu `try/catch` ile korunur; internet
   yoksa döşeme indirilemese bile uygulama çökmez, HUD çalışmaya devam eder.
 - Kareleri **`ImageReader`** üzerinden **RGBA_8888** formatında yakalar; toplam

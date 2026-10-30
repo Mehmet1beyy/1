@@ -1,6 +1,7 @@
 package com.ivd.virtualdisplay;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -10,6 +11,8 @@ import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.view.MotionEvent;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -102,6 +105,9 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
             }
         });
 
+        // Önizlemeye dokunuş -> sanal ekrandaki haritaya aktar.
+        preview.setOnTouchListener(this::onPreviewTouch);
+
         updateControls(false);
     }
 
@@ -172,6 +178,75 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIF);
             }
         }
+    }
+
+    /**
+     * Önizleme ImageView'ine gelen dokunuşu, sanal ekrandaki haritanın piksel
+     * uzayına (1280x720) ölçekleyip MotionEvent olarak servise iletir. Böylece
+     * sürükleme, çift dokunma, pinch ve basılı tutma gibi tüm hareketler
+     * sanal ekrandaki MapView tarafından doğrudan işlenir.
+     *
+     * fitCenter ölçeklemesi nedeniyle görüntü harf kutusu (letterbox) ile
+     * ortalandığından, dokunma koordinatı önce gösterilen görüntü alanına göre
+     * düzeltilir. İşlem hafiftir ve ana iş parçacığını kilitlemez.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private boolean onPreviewTouch(View v, MotionEvent ev) {
+        if (!bound || service == null) {
+            return false;
+        }
+        final int viewW = v.getWidth();
+        final int viewH = v.getHeight();
+        if (viewW <= 0 || viewH <= 0) {
+            return false;
+        }
+
+        // Dokunma başladığında ScrollView'in (ebeveyn) olayı ele geçirip sayfayı
+        // kaydırmasını engelle; sürükleme/pinch haritaya gitsin.
+        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN && v.getParent() != null) {
+            v.getParent().requestDisallowInterceptTouchEvent(true);
+        }
+
+        final int mapW = VirtualDisplayService.WIDTH;
+        final int mapH = VirtualDisplayService.HEIGHT;
+
+        final float scale = Math.min(viewW / (float) mapW, viewH / (float) mapH);
+        if (scale <= 0f) {
+            return false;
+        }
+        final float offX = (viewW - mapW * scale) / 2f;
+        final float offY = (viewH - mapH * scale) / 2f;
+
+        final int pc = ev.getPointerCount();
+        MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[pc];
+        MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[pc];
+        for (int i = 0; i < pc; i++) {
+            MotionEvent.PointerProperties p = new MotionEvent.PointerProperties();
+            ev.getPointerProperties(i, p);
+            props[i] = p;
+
+            MotionEvent.PointerCoords c = new MotionEvent.PointerCoords();
+            ev.getPointerCoords(i, c);
+            c.x = clamp((c.x - offX) / scale, 0f, mapW);
+            c.y = clamp((c.y - offY) / scale, 0f, mapH);
+            coords[i] = c;
+        }
+
+        MotionEvent translated = MotionEvent.obtain(
+                ev.getDownTime(), ev.getEventTime(), ev.getAction(), pc,
+                props, coords, ev.getMetaState(), ev.getButtonState(),
+                ev.getXPrecision(), ev.getYPrecision(), ev.getDeviceId(),
+                ev.getEdgeFlags(), ev.getSource(), ev.getFlags());
+        try {
+            service.forwardTouch(translated);
+        } finally {
+            translated.recycle();
+        }
+        return true;
+    }
+
+    private static float clamp(float value, float lo, float hi) {
+        return value < lo ? lo : (value > hi ? hi : value);
     }
 
     // ----- VirtualDisplayService.Listener (ana iş parçacığında çağrılır) -----

@@ -175,6 +175,19 @@ public class VirtualDisplayService extends Service {
         });
     }
 
+    /**
+     * Ana uygulamanın önizlemesinden gelen (zaten sanal ekran koordinatlarına
+     * ölçeklenmiş) dokunma olayını haritaya iletir. Çağıran ana iş parçacığında
+     * olduğundan doğrudan uygulanır; ağ/tile işleri osmdroid'de arka plandadır,
+     * bu yüzden UI kilitlenmez.
+     */
+    public void forwardTouch(android.view.MotionEvent ev) {
+        MapPresentation p = presentation;
+        if (p != null) {
+            p.dispatchMapTouch(ev);
+        }
+    }
+
     // ----- Yakalama yaşam döngüsü -----
 
     private synchronized void startCapture() {
