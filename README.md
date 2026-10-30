@@ -15,8 +15,10 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
   (ekran görüntüsü yakalama / MediaProjection veya ek izin gerektirmez).
 - Sanal ekrana bir **`Presentation`** bağlar ve içine `NavigationView` çizer:
   yollar/kavşaklar, mavi rota, kırmızı hedef işareti, üstte bilgi paneli, altta
-  durum çubuğu ve rota üzerinde hareket eden araç (sürekli kare üretimi için her
-  karede kendini yeniden çizer).
+  durum çubuğu, rota üzerinde hareket eden araç ve **her saniye değişen bir saat
+  (HH:mm:ss) ile her saniye artan bir test sayacı** (sanal ekranın canlı ve
+  bağımsız olduğunu kanıtlar). Sürekli kare üretimi için her karede kendini
+  yeniden çizer.
 - Kareleri **`ImageReader`** üzerinden **RGBA_8888** formatında yakalar; toplam
   kare sayısını ve anlık FPS'i hesaplar.
 - Tüm bu iş bir **foreground service** (`VirtualDisplayService`,

@@ -48,6 +48,9 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private VirtualDisplayService service;
     private boolean bound = false;
 
+    // Gösterilen son önizleme karesi (yenisi gelince geri dönüştürülür).
+    private Bitmap currentPreview;
+
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -130,6 +133,10 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                 .setAction(VirtualDisplayService.ACTION_STOP);
         startService(intent);
         preview.setImageDrawable(null);
+        if (currentPreview != null && !currentPreview.isRecycled()) {
+            currentPreview.recycle();
+        }
+        currentPreview = null;
         statusText.setText(R.string.status_stopped);
         framesText.setText(getString(R.string.frames_value, 0L));
         fpsText.setText(getString(R.string.fps_value, 0.0));
@@ -156,6 +163,12 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     @Override
     public void onPreview(Bitmap bmp) {
         preview.setImageBitmap(bmp);
+        // Yeni kare yerleştirildiğine göre önceki kareye artık referans yok;
+        // belleği hemen serbest bırak.
+        if (currentPreview != null && currentPreview != bmp && !currentPreview.isRecycled()) {
+            currentPreview.recycle();
+        }
+        currentPreview = bmp;
     }
 
     @Override

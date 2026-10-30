@@ -10,6 +10,10 @@ import android.graphics.Typeface;
 import android.os.SystemClock;
 import android.view.View;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
  * Sanal ekrana çizilen örnek navigasyon arayüzü.
  *
@@ -41,6 +45,16 @@ public class NavigationView extends View {
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint subTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint statusPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    // Saat + test sayacı HUD'u (her saniye değişen canlı içerik)
+    private final Paint hudPanel = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hudValue = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hudLabel = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hudDivider = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final SimpleDateFormat clockFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+    private long lastClockSecond = -1;
+    private String clockText = "--:--:--";
+    private int testCounter = 0;
 
     private final Path routePath = new Path();
     private final RectF rectF = new RectF();
@@ -90,6 +104,14 @@ public class NavigationView extends View {
 
         statusPaint.setColor(Color.WHITE);
         statusPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+
+        hudPanel.setColor(Color.parseColor("#EC0D1A20"));
+        hudValue.setColor(Color.WHITE);
+        hudValue.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        hudLabel.setColor(Color.parseColor("#8FA6B2"));
+        hudLabel.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        hudDivider.setColor(Color.parseColor("#33FFFFFF"));
+        hudDivider.setStrokeWidth(2);
     }
 
     @Override
@@ -161,6 +183,9 @@ public class NavigationView extends View {
 
         // Üst bilgi paneli
         drawTopPanel(canvas, t);
+
+        // Saat + test sayacı HUD'u (her saniye değişir/artar)
+        drawHud(canvas);
 
         // Alt durum çubuğu
         drawBottomBar(canvas);
@@ -256,6 +281,48 @@ public class NavigationView extends View {
         canvas.drawText(remainingM + " m kaldı", BASE_W - 44, 94, subTextPaint);
         textPaint.setTextAlign(Paint.Align.LEFT);
         subTextPaint.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /**
+     * Sanal ekranın canlı/bağımsız olduğunu kanıtlayan HUD: her saniye değişen
+     * bir saat ve her saniye artan bir test sayacı. Değerler yalnızca saniye
+     * değiştiğinde yeniden biçimlenir (gereksiz ayırma yok).
+     */
+    private void drawHud(Canvas canvas) {
+        long nowMs = System.currentTimeMillis();
+        long curSecond = nowMs / 1000L;
+        if (curSecond != lastClockSecond) {
+            lastClockSecond = curSecond;
+            clockText = clockFormat.format(new Date(nowMs));
+        }
+        testCounter = (int) ((SystemClock.uptimeMillis() - startTime) / 1000L);
+
+        final float w = 440;
+        final float h = 104;
+        final float left = (BASE_W - w) / 2f;
+        final float top = 124;
+        final float mid = left + w / 2f;
+
+        rectF.set(left, top, left + w, top + h);
+        canvas.drawRoundRect(rectF, 18, 18, hudPanel);
+        canvas.drawLine(mid, top + 20, mid, top + h - 20, hudDivider);
+
+        // Sol: SAAT
+        hudLabel.setTextSize(22);
+        hudLabel.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText("SAAT", (left + mid) / 2f, top + 38, hudLabel);
+        hudValue.setTextSize(46);
+        hudValue.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(clockText, (left + mid) / 2f, top + 84, hudValue);
+
+        // Sağ: TEST SAYACI
+        hudLabel.setTextSize(22);
+        canvas.drawText("TEST SAYACI", (mid + left + w) / 2f, top + 38, hudLabel);
+        hudValue.setTextSize(46);
+        canvas.drawText(String.valueOf(testCounter), (mid + left + w) / 2f, top + 84, hudValue);
+
+        hudLabel.setTextAlign(Paint.Align.LEFT);
+        hudValue.setTextAlign(Paint.Align.LEFT);
     }
 
     private void drawBottomBar(Canvas canvas) {
