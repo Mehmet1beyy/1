@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Monitör gövdesi -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,34h48c2.2,0 4,1.8 4,4v26c0,2.2 -1.8,4 -4,4H60v4h7v5H41v-5h7v-4H30c-2.2,0 -4,-1.8 -4,-4V38C26,35.8 27.8,34 30,34z" />
+    <!-- Ekran içi (koyu) -->
+    <path
+        android:fillColor="#102027"
+        android:pathData="M31,39h46v24H31z" />
+    <!-- Mavi rota -->
+    <path
+        android:strokeColor="#2979FF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M37,58 L37,50 L50,50 L50,44 L66,44" />
+    <!-- Kırmızı hedef -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M66,40m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0" />
+</vector>

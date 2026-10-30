@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Independent Virtual Display</string>
+    <string name="subtitle">Fiziksel ekrandan bağımsız sanal ekran (1280×720)</string>
+
+    <string name="start">Sanal Ekranı Başlat</string>
+    <string name="stop">Sanal Ekranı Durdur</string>
+
+    <string name="status_stopped">Durdu</string>
+    <string name="status_starting">Başlatılıyor…</string>
+    <string name="status_running">Çalışıyor</string>
+
+    <string name="preview_desc">Sanal ekranın canlı önizlemesi</string>
+    <string name="preview_hint">Yukarıdaki görüntü sanal ekranda üretilen karelerin kopyasıdır.</string>
+
+    <!-- %1$d genişlik, %2$d yükseklik -->
+    <string name="resolution_value">Çözünürlük: %1$d × %2$d</string>
+    <!-- %1$d toplam kare -->
+    <string name="frames_value">Toplam kare: %1$d</string>
+    <!-- %1$.1f anlık FPS -->
+    <string name="fps_value">FPS: %1$.1f</string>
+
+    <string name="frames_initial">Toplam kare: 0</string>
+    <string name="fps_initial">FPS: 0.0</string>
+</resources>

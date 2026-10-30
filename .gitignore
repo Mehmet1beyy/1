@@ -1,0 +1,12 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+# Kök dizine kopyalanan derleme çıktısı (kaynaktan yeniden üretilebilir)
+/IndependentVirtualDisplay-debug.apk
