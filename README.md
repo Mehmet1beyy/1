@@ -13,12 +13,19 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
   **VirtualDisplay** oluşturur (1280×720). Bayraklar:
   `VIRTUAL_DISPLAY_FLAG_PRESENTATION | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY`
   (ekran görüntüsü yakalama / MediaProjection veya ek izin gerektirmez).
-- Sanal ekrana bir **`Presentation`** bağlar ve içine `NavigationView` çizer:
-  yollar/kavşaklar, mavi rota, kırmızı hedef işareti, üstte bilgi paneli, altta
-  durum çubuğu, rota üzerinde hareket eden araç ve **her saniye değişen bir saat
-  (HH:mm:ss) ile her saniye artan bir test sayacı** (sanal ekranın canlı ve
-  bağımsız olduğunu kanıtlar). Sürekli kare üretimi için her karede kendini
-  yeniden çizer.
+- Sanal ekrana bir **`Presentation`** (`MapPresentation`) bağlar ve içine
+  **gerçek bir OpenStreetMap haritası** (osmdroid `MapView`) ile bir **konum
+  işaretçisi** yerleştirir. Harita, telefonun fiziksel ekranından **bağımsız**
+  olarak doğrudan sanal ekranda oluşturulur (ekran kopyalama/mirror yok).
+- Haritanın üzerine şeffaf bir **`HudOverlayView`** çizilir: **her saniye değişen
+  saat (HH:mm:ss)** ve **her saniye artan test sayacı** (sanal ekranın canlı ve
+  bağımsız olduğunu kanıtlar). Bu katman her karede kendini yeniden çizerek
+  sürekli kare üretimini garanti eder (harita hareketsiz olsa bile FPS/sayaç
+  artmaya devam eder).
+- **Yakınlaştırma/uzaklaştırma:** ana uygulamadaki `+` / `−` düğmeleri, bağlı
+  servis üzerinden sanal ekrandaki haritanın zoom'unu kontrol eder.
+- **Çevrimdışı dayanıklılık:** harita kurulumu `try/catch` ile korunur; internet
+  yoksa döşeme indirilemese bile uygulama çökmez, HUD çalışmaya devam eder.
 - Kareleri **`ImageReader`** üzerinden **RGBA_8888** formatında yakalar; toplam
   kare sayısını ve anlık FPS'i hesaplar.
 - Tüm bu iş bir **foreground service** (`VirtualDisplayService`,
@@ -44,19 +51,27 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
 - `FOREGROUND_SERVICE`
 - `FOREGROUND_SERVICE_SPECIAL_USE`
 - `POST_NOTIFICATIONS` (Android 13+ bildirim için; reddedilse bile servis çalışır)
+- `INTERNET` (OSM harita döşemelerini indirmek için)
+- `ACCESS_NETWORK_STATE` (osmdroid bağlantı kontrolü için)
 
-Root, sistem dosyası değişikliği veya ekran yakalama izni **gerektirmez**.
+Root, sistem dosyası değişikliği, konum (GPS) veya ekran yakalama izni
+**gerektirmez**.
 
 ## Proje yapısı
 
 ```
 app/src/main/java/com/ivd/virtualdisplay/
-  MainActivity.java            # Arayüz + servise bağlanma, canlı önizleme
+  MainActivity.java            # Arayüz + servise bağlanma, canlı önizleme, zoom
   VirtualDisplayService.java   # VirtualDisplay + ImageReader + Presentation (foreground)
-  NavigationPresentation.java  # Sanal ekrana bağlanan Presentation
-  NavigationView.java          # Örnek navigasyon arayüzü (sürekli çizim)
+  MapPresentation.java         # Sanal ekrana bağlanan Presentation: OSM haritası + işaretçi
+  HudOverlayView.java          # Harita üstü şeffaf HUD: saat/sayaç + sürekli kare
 app/src/main/res/...           # layout, strings, tema, simgeler
 ```
+
+## Bağımlılıklar
+
+- `androidx.appcompat`, `com.google.android.material`
+- `org.osmdroid:osmdroid-android:6.1.20` (OpenStreetMap harita motoru)
 
 ## Derleme
 
@@ -88,11 +103,14 @@ kaynaklara izin vermeniz gerekebilir).
 ## Test senaryosu (cihazda)
 
 1. Uygulamayı aç, **Başlat**'a bas.
-2. Önizlemede navigasyon görüntüsünü gör; kare sayacı ve FPS artmaya başlar.
-3. Ana ekrana dön, WhatsApp/tarayıcı gibi başka bir uygulama aç.
-4. Uygulamaya geri döndüğünde **kare sayacı ve FPS'in artmış** olduğunu gör
-   (sanal ekran arka planda üretmeye devam etti).
-5. **Durdur**'a basınca kaynaklar serbest bırakılır.
+2. Önizlemede gerçek harita + konum işaretçisi + saat/sayacı gör; kare sayacı ve
+   FPS artmaya başlar.
+3. `+` / `−` düğmeleriyle sanal ekrandaki haritayı yakınlaştır/uzaklaştır.
+4. Ana ekrana dön, WhatsApp/tarayıcı gibi başka bir uygulama aç.
+5. Uygulamaya geri döndüğünde önizleme **güncel haritayı** gösterir; **kare
+   sayacı ve FPS'in artmış** olduğunu gör (sanal ekran arka planda üretmeye
+   devam etti).
+6. **Durdur**'a basınca kaynaklar serbest bırakılır.
 
 ---
 

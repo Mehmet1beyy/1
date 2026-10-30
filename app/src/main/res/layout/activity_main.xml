@@ -114,5 +114,37 @@
                 android:text="@string/stop" />
         </LinearLayout>
 
+        <!-- Harita yakınlaştırma kontrolleri -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/map_zoom_label"
+            android:textColor="#90A4AE"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/zoomInButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:text="@string/zoom_in" />
+
+            <Button
+                android:id="@+id/zoomOutButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/zoom_out" />
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>

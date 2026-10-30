@@ -39,6 +39,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
 
     private Button startButton;
     private Button stopButton;
+    private Button zoomInButton;
+    private Button zoomOutButton;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
@@ -76,6 +78,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
 
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
+        zoomInButton = findViewById(R.id.zoomInButton);
+        zoomOutButton = findViewById(R.id.zoomOutButton);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
@@ -87,6 +91,16 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
 
         startButton.setOnClickListener(v -> onStartClicked());
         stopButton.setOnClickListener(v -> onStopClicked());
+        zoomInButton.setOnClickListener(v -> {
+            if (bound && service != null) {
+                service.zoomIn();
+            }
+        });
+        zoomOutButton.setOnClickListener(v -> {
+            if (bound && service != null) {
+                service.zoomOut();
+            }
+        });
 
         updateControls(false);
     }
@@ -146,6 +160,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private void updateControls(boolean running) {
         startButton.setEnabled(!running);
         stopButton.setEnabled(running);
+        zoomInButton.setEnabled(running);
+        zoomOutButton.setEnabled(running);
     }
 
     private void ensureNotificationPermission() {

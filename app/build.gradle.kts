@@ -10,8 +10,8 @@ android {
         applicationId = "com.ivd.virtualdisplay"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildTypes {
@@ -33,4 +33,6 @@ android {
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    // Gerçek harita (OpenStreetMap) — sanal ekranda doğrudan oluşturulur.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

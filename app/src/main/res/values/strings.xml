@@ -22,4 +22,8 @@
 
     <string name="frames_initial">Toplam kare: 0</string>
     <string name="fps_initial">FPS: 0.0</string>
+
+    <string name="map_zoom_label">Sanal ekrandaki harita yakınlaştırma</string>
+    <string name="zoom_in">Yakınlaştır (+)</string>
+    <string name="zoom_out">Uzaklaştır (−)</string>
 </resources>

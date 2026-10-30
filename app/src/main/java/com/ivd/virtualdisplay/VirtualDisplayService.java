@@ -31,7 +31,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Sanal ekranı (VirtualDisplay) oluşturan, {@link NavigationPresentation} ile
+ * Sanal ekranı (VirtualDisplay) oluşturan, {@link MapPresentation} ile
  * içerik çizen ve {@link ImageReader} aracılığıyla kareleri yakalayan
  * foreground service.
  *
@@ -58,7 +58,7 @@ public class VirtualDisplayService extends Service {
     private DisplayManager displayManager;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
-    private NavigationPresentation presentation;
+    private MapPresentation presentation;
 
     private HandlerThread readerThread;
     private Handler readerHandler;
@@ -155,6 +155,26 @@ public class VirtualDisplayService extends Service {
         return fps;
     }
 
+    /** Sanal ekrandaki haritayı yakınlaştır (ana iş parçacığında uygulanır). */
+    public void zoomIn() {
+        mainHandler.post(() -> {
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.zoomIn();
+            }
+        });
+    }
+
+    /** Sanal ekrandaki haritayı uzaklaştır (ana iş parçacığında uygulanır). */
+    public void zoomOut() {
+        mainHandler.post(() -> {
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.zoomOut();
+            }
+        });
+    }
+
     // ----- Yakalama yaşam döngüsü -----
 
     private synchronized void startCapture() {
@@ -205,7 +225,7 @@ public class VirtualDisplayService extends Service {
             if (!running || display == null) {
                 return;
             }
-            presentation = new NavigationPresentation(this, display);
+            presentation = new MapPresentation(this, display);
             presentation.show();
         } catch (WindowManager.InvalidDisplayException e) {
             Log.e(TAG, "Presentation gösterilemedi: geçersiz ekran", e);
@@ -310,7 +330,7 @@ public class VirtualDisplayService extends Service {
     private synchronized void stopCapture() {
         running = false;
 
-        final NavigationPresentation p = presentation;
+        final MapPresentation p = presentation;
         presentation = null;
         if (p != null) {
             mainHandler.post(() -> {
