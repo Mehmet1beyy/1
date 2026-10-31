@@ -6,15 +6,20 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -24,8 +29,10 @@ import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
@@ -74,14 +81,35 @@ public class VirtualDisplayService extends Service {
     private long lastPreviewMs = 0;
     private long lastStatsMs = 0;
 
+    // --- GPS (olay tabanlı) ---
+    private LocationManager locationManager;
+    private boolean locationActive = false;
+    private volatile boolean gpsProviderEnabled = false;
+
+    // Son geçerli konum (sinyal kaybında korunur; eski veriyi yeni gibi göstermeyiz).
+    private volatile boolean hasFix = false;
+    private double lastLat;
+    private double lastLon;
+    private float lastAccuracy;
+    private long lastFixTimeMs;   // GPS ölçüm zamanı (Location.getTime)
+    private long lastArrivalMs;   // Uygulamaya ulaşma zamanı
+    private String lastProvider = "";
+
     @Nullable
     private volatile Listener listener;
 
-    /** Activity'ye önizleme ve istatistik iletmek için geri çağrı. */
+    /** Activity'ye önizleme, istatistik ve konum iletmek için geri çağrı. */
     public interface Listener {
         void onPreview(Bitmap preview);
 
         void onStats(boolean running, long frames, double fps);
+
+        /** Yeni gerçek GPS düzeltmesi geldiğinde (ana iş parçacığında). */
+        void onLocation(double lat, double lon, float accuracy,
+                        long fixTimeMs, long arrivalMs, String provider);
+
+        /** GPS sağlayıcı/izin durumu değiştiğinde. */
+        void onGpsAvailability(boolean providerEnabled, boolean permissionGranted);
     }
 
     public class LocalBinder extends Binder {
@@ -95,12 +123,14 @@ public class VirtualDisplayService extends Service {
         super.onCreate();
         mainHandler = new Handler(Looper.getMainLooper());
         displayManager = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         createNotificationChannel();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForegroundInternal();
+        boolean locationPermitted = hasLocationPermission();
+        startForegroundInternal(locationPermitted);
 
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(action)) {
@@ -112,6 +142,12 @@ public class VirtualDisplayService extends Service {
 
         // Varsayılan: sanal ekranı başlat.
         startCapture();
+        // İzin verildiyse GPS'i hemen başlat (olay tabanlı).
+        if (locationPermitted) {
+            startLocation();
+        } else {
+            notifyGpsAvailability();
+        }
         return START_STICKY;
     }
 
@@ -141,6 +177,11 @@ public class VirtualDisplayService extends Service {
         this.listener = l;
         // Yeni bağlanan Activity'ye mevcut durumu hemen bildir.
         notifyStats();
+        notifyGpsAvailability();
+        // Geri dönen Activity, en son geçerli konumu hemen görsün.
+        if (l != null && hasFix) {
+            l.onLocation(lastLat, lastLon, lastAccuracy, lastFixTimeMs, lastArrivalMs, lastProvider);
+        }
     }
 
     public boolean isRunning() {
@@ -186,6 +227,148 @@ public class VirtualDisplayService extends Service {
         if (p != null) {
             p.dispatchMapTouch(ev);
         }
+    }
+
+    /** "Konumuma dön": haritayı son gerçek konuma ortala ve takibi aç. */
+    public void recenter() {
+        mainHandler.post(() -> {
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.recenter();
+            }
+        });
+    }
+
+    /**
+     * Konum izni sonradan verildiğinde Activity tarafından çağrılır. Foreground
+     * servisi {@code location} tipini içerecek şekilde yükseltir ve GPS'i başlatır.
+     */
+    public void enableLocation() {
+        if (!running) {
+            return;
+        }
+        if (!hasLocationPermission()) {
+            notifyGpsAvailability();
+            return;
+        }
+        // Foreground servis tipini location içerecek şekilde güncelle.
+        startForegroundInternal(true);
+        startLocation();
+    }
+
+    // ----- GPS (olay tabanlı) -----
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(@NonNull Location location) {
+            long arrival = System.currentTimeMillis();
+            lastLat = location.getLatitude();
+            lastLon = location.getLongitude();
+            lastAccuracy = location.hasAccuracy() ? location.getAccuracy() : 0f;
+            lastFixTimeMs = location.getTime();
+            lastArrivalMs = arrival;
+            lastProvider = location.getProvider() != null ? location.getProvider() : "";
+            hasFix = true;
+            gpsProviderEnabled = true;
+
+            // Callback ana Looper'da gelir: haritayı doğrudan güncelle (hafif).
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.updateLocation(lastLat, lastLon, lastAccuracy);
+            }
+            Listener l = listener;
+            if (l != null) {
+                l.onLocation(lastLat, lastLon, lastAccuracy, lastFixTimeMs, arrival, lastProvider);
+            }
+        }
+
+        @Override
+        public void onProviderEnabled(@NonNull String provider) {
+            gpsProviderEnabled = true;
+            notifyGpsAvailability();
+        }
+
+        @Override
+        public void onProviderDisabled(@NonNull String provider) {
+            // Sağlayıcı kapandı; son konumu koru, işaretçiyi oynatma.
+            if (LocationManager.GPS_PROVIDER.equals(provider)) {
+                gpsProviderEnabled = false;
+            }
+            notifyGpsAvailability();
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            // Eski API'ler için; modern cihazlarda genelde çağrılmaz.
+        }
+    };
+
+    @SuppressWarnings("MissingPermission")
+    private void startLocation() {
+        if (locationActive || locationManager == null || !hasLocationPermission()) {
+            return;
+        }
+        try {
+            boolean anyProvider = false;
+            // En yüksek sıklık: minTime=0, minDistance=0 (polling/timer yok).
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, 0L, 0f,
+                        locationListener, Looper.getMainLooper());
+                gpsProviderEnabled = true;
+                anyProvider = true;
+            }
+            // Ağ sağlayıcısı: daha hızlı ilk düzeltme için (varsa).
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.NETWORK_PROVIDER, 0L, 0f,
+                        locationListener, Looper.getMainLooper());
+                anyProvider = true;
+            }
+            locationActive = true;
+            gpsProviderEnabled = gpsProviderEnabled || anyProvider;
+            Log.i(TAG, "GPS dinleme başladı (olay tabanlı).");
+        } catch (SecurityException e) {
+            Log.e(TAG, "GPS izni yok", e);
+        } catch (Exception e) {
+            Log.e(TAG, "startLocation hatası", e);
+        }
+        notifyGpsAvailability();
+    }
+
+    private void stopLocation() {
+        if (locationManager != null) {
+            try {
+                locationManager.removeUpdates(locationListener);
+            } catch (Exception e) {
+                Log.e(TAG, "stopLocation hatası", e);
+            }
+        }
+        locationActive = false;
+    }
+
+    private boolean hasLocationPermission() {
+        return ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void notifyGpsAvailability() {
+        Listener l = listener;
+        if (l == null) {
+            return;
+        }
+        final boolean enabled = gpsProviderEnabled;
+        final boolean granted = hasLocationPermission();
+        mainHandler.post(() -> {
+            Listener cur = listener;
+            if (cur != null) {
+                cur.onGpsAvailability(enabled, granted);
+            }
+        });
     }
 
     // ----- Yakalama yaşam döngüsü -----
@@ -343,6 +526,9 @@ public class VirtualDisplayService extends Service {
     private synchronized void stopCapture() {
         running = false;
 
+        // GPS dinleyicilerini düzgün kapat.
+        stopLocation();
+
         final MapPresentation p = presentation;
         presentation = null;
         if (p != null) {
@@ -392,18 +578,24 @@ public class VirtualDisplayService extends Service {
 
     // ----- Foreground / bildirim -----
 
-    private void startForegroundInternal() {
+    private void startForegroundInternal(boolean withLocation) {
+        boolean locationType = withLocation && hasLocationPermission();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Independent Virtual Display")
-                .setContentText("Sanal ekran arka planda çalışıyor")
+                .setContentText(locationType
+                        ? "Sanal ekran + GPS arka planda çalışıyor"
+                        : "Sanal ekran arka planda çalışıyor")
                 .setSmallIcon(R.drawable.ic_stat_display)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIF_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            int type = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
+            if (locationType) {
+                type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+            }
+            startForeground(NOTIF_ID, notification, type);
         } else {
             startForeground(NOTIF_ID, notification);
         }

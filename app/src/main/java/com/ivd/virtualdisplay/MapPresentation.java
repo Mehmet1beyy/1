@@ -32,15 +32,25 @@ public class MapPresentation extends Presentation {
 
     private static final String TAG = "IVDMap";
 
-    // Başlangıç konumu (İstanbul) ve işaretçi.
-    private static final double START_LAT = 41.0082;
-    private static final double START_LON = 28.9784;
-    private static final double START_ZOOM = 15.0;
+    // İlk GPS düzeltmesi gelene kadar yalnızca KAMERA için nötr başlangıç görünümü
+    // (konum işaretçisi değildir; sabit/simüle konum olarak kullanılmaz).
+    private static final double INITIAL_CAMERA_LAT = 39.0;
+    private static final double INITIAL_CAMERA_LON = 35.0;
+    private static final double INITIAL_CAMERA_ZOOM = 5.0;
+    private static final double FIRST_FIX_ZOOM = 17.0;
     private static final double MIN_ZOOM = 3.0;
     private static final double MAX_ZOOM = 19.0;
 
     private MapView mapView;
     private HudOverlayView hud;
+
+    // Gerçek GPS işaretçisi (ilk düzeltmede oluşturulur).
+    private Marker locationMarker;
+    private Double lastLat;
+    private Double lastLon;
+    private boolean firstFix = true;
+    // Otomatik konum takibi; kullanıcı haritayı elle kaydırınca geçici kapanır.
+    private boolean autoFollow = true;
 
     public MapPresentation(Context outerContext, Display display) {
         super(outerContext, display);
@@ -78,16 +88,9 @@ public class MapPresentation extends Presentation {
             mapView.getZoomController()
                     .setVisibility(CustomZoomButtonsController.Visibility.NEVER);
 
-            mapView.getController().setZoom(START_ZOOM);
-            GeoPoint start = new GeoPoint(START_LAT, START_LON);
-            mapView.getController().setCenter(start);
-
-            // Konum işaretçisi
-            Marker marker = new Marker(mapView);
-            marker.setPosition(start);
-            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            marker.setTitle("Konum");
-            mapView.getOverlays().add(marker);
+            // Yalnızca kamera başlangıç görünümü; işaretçi GPS düzeltmesiyle eklenir.
+            mapView.getController().setZoom(INITIAL_CAMERA_ZOOM);
+            mapView.getController().setCenter(new GeoPoint(INITIAL_CAMERA_LAT, INITIAL_CAMERA_LON));
 
             root.addView(mapView, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -140,10 +143,68 @@ public class MapPresentation extends Presentation {
     public void dispatchMapTouch(android.view.MotionEvent ev) {
         try {
             if (mapView != null && ev != null) {
+                // Kullanıcı haritayı elle kaydırırsa otomatik takibi geçici kapat.
+                if (ev.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
+                    autoFollow = false;
+                }
                 mapView.dispatchTouchEvent(ev);
             }
         } catch (Throwable t) {
             Log.e(TAG, "dispatchMapTouch hatası", t);
+        }
+    }
+
+    /**
+     * Gerçek GPS konumunu haritaya uygular (ana iş parçacığında). İşaretçi yoksa
+     * oluşturulur; otomatik takip açıksa harita konuma ortalanır. Konum
+     * değişmediyse gereksiz yenileme yapılmaz.
+     */
+    public void updateLocation(double lat, double lon, float accuracy) {
+        try {
+            if (mapView == null) {
+                return;
+            }
+            // Konum değişmediyse gereksiz harita yenilemesi yapma.
+            if (lastLat != null && lastLon != null
+                    && lastLat == lat && lastLon == lon) {
+                return;
+            }
+            lastLat = lat;
+            lastLon = lon;
+            GeoPoint gp = new GeoPoint(lat, lon);
+
+            if (locationMarker == null) {
+                locationMarker = new Marker(mapView);
+                locationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+                locationMarker.setTitle("Konumum");
+                mapView.getOverlays().add(locationMarker);
+            }
+            locationMarker.setPosition(gp);
+            locationMarker.setSnippet(String.format(java.util.Locale.US, "±%.0f m", accuracy));
+
+            if (firstFix) {
+                firstFix = false;
+                mapView.getController().setZoom(FIRST_FIX_ZOOM);
+                mapView.getController().setCenter(gp);
+            } else if (autoFollow) {
+                // En düşük gecikme için anında ortala.
+                mapView.getController().setCenter(gp);
+            }
+            mapView.invalidate();
+        } catch (Throwable t) {
+            Log.e(TAG, "updateLocation hatası", t);
+        }
+    }
+
+    /** "Konumuma dön": otomatik takibi aç ve son konuma git. */
+    public void recenter() {
+        try {
+            autoFollow = true;
+            if (mapView != null && lastLat != null && lastLon != null) {
+                mapView.getController().animateTo(new GeoPoint(lastLat, lastLon));
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "recenter hatası", t);
         }
     }
 

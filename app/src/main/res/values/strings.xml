@@ -26,4 +26,34 @@
     <string name="map_zoom_label">Sanal ekrandaki harita yakınlaştırma</string>
     <string name="zoom_in">Yakınlaştır (+)</string>
     <string name="zoom_out">Uzaklaştır (−)</string>
+
+    <string name="gps_title">GPS / Konum</string>
+    <string name="gps_status_waiting">Konum bekleniyor…</string>
+    <string name="gps_status_connected">Bağlı</string>
+    <string name="gps_status_nosignal">Sinyal yok</string>
+    <string name="gps_status_disabled">GPS kapalı</string>
+    <string name="gps_status_noperm">Konum izni yok</string>
+    <string name="recenter">Konumuma dön</string>
+    <string name="perm_warning">Konum izni verilmedi. Gerçek GPS konumu için lütfen izin verin (Ayarlar → Uygulama → İzinler → Konum). İzin verildiğinde otomatik algılanır.</string>
+
+    <string name="lat_initial">Enlem: —</string>
+    <string name="lon_initial">Boylam: —</string>
+    <string name="acc_initial">Doğruluk: —</string>
+    <string name="fixtime_initial">Son ölçüm zamanı: —</string>
+    <string name="arrival_initial">Uygulamaya ulaşma: —</string>
+    <string name="latency_initial">Ölçüm→uygulama gecikmesi: —</string>
+    <string name="elapsed_initial">Son güncellemeden: —</string>
+
+    <!-- %1$.6f -->
+    <string name="lat_value">Enlem: %1$.6f</string>
+    <string name="lon_value">Boylam: %1$.6f</string>
+    <!-- %1$.0f metre -->
+    <string name="acc_value">Doğruluk: ±%1$.0f m</string>
+    <!-- %1$s zaman -->
+    <string name="fixtime_value">Son ölçüm zamanı: %1$s</string>
+    <string name="arrival_value">Uygulamaya ulaşma: %1$s</string>
+    <!-- %1$d ms -->
+    <string name="latency_value">Ölçüm→uygulama gecikmesi: %1$d ms</string>
+    <!-- %1$.1f sn -->
+    <string name="elapsed_value">Son güncellemeden: %1$.1f sn önce</string>
 </resources>

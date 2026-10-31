@@ -45,6 +45,117 @@
             android:textColor="#607D8B"
             android:textSize="12sp" />
 
+        <!-- Konum izni uyarısı -->
+        <TextView
+            android:id="@+id/permWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#3A1C12"
+            android:padding="12dp"
+            android:text="@string/perm_warning"
+            android:textColor="#FFB74D"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- GPS bilgi kartı -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="#182029"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/gps_title"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/gpsStatusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/gps_status_waiting"
+                android:textColor="#4CAF50"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/latText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/lat_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/lonText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/lon_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/accText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/acc_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/fixTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/fixtime_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/arrivalText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/arrival_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/latencyText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/latency_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/elapsedText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/elapsed_initial"
+                android:textColor="#CFD8DC"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/recenterButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/recenter" />
+        </LinearLayout>
+
         <!-- Durum kartı -->
         <LinearLayout
             android:layout_width="match_parent"

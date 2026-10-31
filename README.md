@@ -33,6 +33,18 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
   olduğundan arayüz kilitlenmez (ScrollView'in olayı ele geçirmesi engellenir).
 - **Çevrimdışı dayanıklılık:** harita kurulumu `try/catch` ile korunur; internet
   yoksa döşeme indirilemese bile uygulama çökmez, HUD çalışmaya devam eder.
+- **Gerçek GPS (olay tabanlı):** telefonun gerçek konumu `LocationManager` ile,
+  polling/timer olmadan (`minTime=0, minDistance=0`) alınır. Akış:
+  `GPS → LocationListener → Servis → MapPresentation.updateLocation → işaretçi`.
+  İşaretçi her yeni düzeltmede hareket eder; konum değişmediyse gereksiz yenileme
+  yapılmaz. Harita otomatik konumu takip eder; kullanıcı eliyle kaydırınca takip
+  geçici kapanır, **Konumuma dön** düğmesiyle tekrar açılır. GPS, servis
+  `location` foreground tipiyle arka planda da çalışır. Sinyal/izin kaybında son
+  konum korunur, işaretçi oynatılmaz, durum ana uygulamada bildirilir; GPS geri
+  gelince otomatik devam eder.
+- **Ana uygulamada GPS paneli:** enlem, boylam, doğruluk (m), bağlantı durumu,
+  son ölçüm zamanı, uygulamaya ulaşma zamanı, ölçüm→uygulama gecikmesi ve son
+  güncellemeden geçen süre (gerçek GPS verisinden).
 - Kareleri **`ImageReader`** üzerinden **RGBA_8888** formatında yakalar; toplam
   kare sayısını ve anlık FPS'i hesaplar.
 - Tüm bu iş bir **foreground service** (`VirtualDisplayService`,
@@ -60,17 +72,20 @@ Hedef cihaz: **vivo X200 Pro · Android 15 · ARM64** (minSdk 29, targetSdk 35).
 - `POST_NOTIFICATIONS` (Android 13+ bildirim için; reddedilse bile servis çalışır)
 - `INTERNET` (OSM harita döşemelerini indirmek için)
 - `ACCESS_NETWORK_STATE` (osmdroid bağlantı kontrolü için)
+- `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` (gerçek GPS konumu)
+- `FOREGROUND_SERVICE_LOCATION` (arka planda konum güncellemeleri)
 
-Root, sistem dosyası değişikliği, konum (GPS) veya ekran yakalama izni
-**gerektirmez**.
+Root, sistem dosyası değişikliği veya ekran yakalama izni **gerektirmez**.
+Konum izni ilk açılışta istenir; verilmezse uygulama çökmeden açık bir uyarı
+gösterir ve izin sonradan verildiğinde otomatik algılar.
 
 ## Proje yapısı
 
 ```
 app/src/main/java/com/ivd/virtualdisplay/
   MainActivity.java            # Arayüz + servise bağlanma, canlı önizleme, zoom
-  VirtualDisplayService.java   # VirtualDisplay + ImageReader + Presentation (foreground)
-  MapPresentation.java         # Sanal ekrana bağlanan Presentation: OSM haritası + işaretçi
+  VirtualDisplayService.java   # VirtualDisplay + ImageReader + Presentation + GPS (foreground: specialUse|location)
+  MapPresentation.java         # Sanal ekrana bağlanan Presentation: OSM haritası + GPS işaretçisi + takip
   HudOverlayView.java          # Harita üstü şeffaf HUD: saat/sayaç + sürekli kare
 app/src/main/res/...           # layout, strings, tema, simgeler
 ```

@@ -10,7 +10,9 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
@@ -23,6 +25,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 /**
@@ -39,22 +43,56 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity implements VirtualDisplayService.Listener {
 
     private static final int REQ_POST_NOTIF = 42;
+    private static final int REQ_LOCATION = 43;
+    private static final long STALE_MS = 5000L; // bu süreden eski fix "sinyal zayıf"
 
     private Button startButton;
     private Button stopButton;
     private Button zoomInButton;
     private Button zoomOutButton;
+    private Button recenterButton;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
     private TextView framesText;
     private TextView fpsText;
 
+    // GPS göstergeleri
+    private TextView gpsStatusText;
+    private TextView latText;
+    private TextView lonText;
+    private TextView accText;
+    private TextView fixTimeText;
+    private TextView arrivalText;
+    private TextView latencyText;
+    private TextView elapsedText;
+    private TextView permWarning;
+
     private VirtualDisplayService service;
     private boolean bound = false;
 
     // Gösterilen son önizleme karesi (yenisi gelince geri dönüştürülür).
     private Bitmap currentPreview;
+
+    // GPS durum takibi (yalnızca gösterim; marker hareketi servis callback'inden).
+    private boolean hasFix = false;
+    private long lastArrivalMs = 0L;
+    private boolean gpsProviderEnabled = false;
+    private boolean permGranted = false;
+
+    private final SimpleDateFormat timeFmt =
+            new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
+
+    // Hafif UI tiker: yalnızca "geçen süre" etiketini ve bayatlık durumunu
+    // tazeler (GPS polling DEĞİL — konum tamamen olay tabanlıdır).
+    private final Handler uiTicker = new Handler(Looper.getMainLooper());
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            refreshElapsedAndStatus();
+            uiTicker.postDelayed(this, 500L);
+        }
+    };
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -65,6 +103,10 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
             bound = true;
             service.setListener(MainActivity.this);
             updateControls(service.isRunning());
+            // İzin sonradan verildiyse ve yakalama sürüyorsa GPS'i başlat.
+            if (service.isRunning() && hasLocationPermission()) {
+                service.enableLocation();
+            }
         }
 
         @Override
@@ -83,11 +125,22 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         stopButton = findViewById(R.id.stopButton);
         zoomInButton = findViewById(R.id.zoomInButton);
         zoomOutButton = findViewById(R.id.zoomOutButton);
+        recenterButton = findViewById(R.id.recenterButton);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
         framesText = findViewById(R.id.framesText);
         fpsText = findViewById(R.id.fpsText);
+
+        gpsStatusText = findViewById(R.id.gpsStatusText);
+        latText = findViewById(R.id.latText);
+        lonText = findViewById(R.id.lonText);
+        accText = findViewById(R.id.accText);
+        fixTimeText = findViewById(R.id.fixTimeText);
+        arrivalText = findViewById(R.id.arrivalText);
+        latencyText = findViewById(R.id.latencyText);
+        elapsedText = findViewById(R.id.elapsedText);
+        permWarning = findViewById(R.id.permWarning);
 
         resolutionText.setText(getString(R.string.resolution_value,
                 VirtualDisplayService.WIDTH, VirtualDisplayService.HEIGHT));
@@ -104,11 +157,20 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                 service.zoomOut();
             }
         });
+        recenterButton.setOnClickListener(v -> {
+            if (bound && service != null) {
+                service.recenter();
+            }
+        });
 
         // Önizlemeye dokunuş -> sanal ekrandaki haritaya aktar.
         preview.setOnTouchListener(this::onPreviewTouch);
 
+        // İlk açılışta gerekli izinleri iste.
+        requestInitialPermissions();
+
         updateControls(false);
+        updatePermWarning();
     }
 
     @Override
@@ -118,11 +180,17 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         // kullanıcı düğmeye bastığında startForegroundService ile yapılır.
         bindService(new Intent(this, VirtualDisplayService.class),
                 connection, Context.BIND_AUTO_CREATE);
+        // Kullanıcı izni ayarlardan sonradan vermiş olabilir: algıla ve uyarıyı güncelle.
+        updatePermWarning();
+        // "Geçen süre"/bayatlık göstergesi için hafif UI tazeleyici.
+        uiTicker.removeCallbacks(tick);
+        uiTicker.post(tick);
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+        uiTicker.removeCallbacks(tick);
         // Sızıntıyı önlemek için dinleyiciyi bırak ve bağlantıyı çöz.
         // Servis başlatıldıysa (foreground) çalışmaya devam eder.
         if (bound) {
@@ -136,6 +204,7 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
 
     private void onStartClicked() {
         ensureNotificationPermission();
+        ensureLocationPermission();
         Intent intent = new Intent(this, VirtualDisplayService.class)
                 .setAction(VirtualDisplayService.ACTION_START);
         ContextCompat.startForegroundService(this, intent);
@@ -168,6 +237,7 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         stopButton.setEnabled(running);
         zoomInButton.setEnabled(running);
         zoomOutButton.setEnabled(running);
+        recenterButton.setEnabled(running);
     }
 
     private void ensureNotificationPermission() {
@@ -178,6 +248,38 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIF);
             }
         }
+    }
+
+    private void requestInitialPermissions() {
+        // İlk açılışta bildirim + konum izinlerini iste.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_POST_NOTIF);
+        }
+        ensureLocationPermission();
+    }
+
+    private void ensureLocationPermission() {
+        if (!hasLocationPermission()) {
+            ActivityCompat.requestPermissions(this, new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }, REQ_LOCATION);
+        }
+    }
+
+    private boolean hasLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void updatePermWarning() {
+        permGranted = hasLocationPermission();
+        permWarning.setVisibility(permGranted ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -271,11 +373,76 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     }
 
     @Override
+    public void onLocation(double lat, double lon, float accuracy,
+                           long fixTimeMs, long arrivalMs, String provider) {
+        hasFix = true;
+        lastArrivalMs = arrivalMs;
+
+        latText.setText(getString(R.string.lat_value, lat));
+        lonText.setText(getString(R.string.lon_value, lon));
+        accText.setText(getString(R.string.acc_value, accuracy));
+        fixTimeText.setText(getString(R.string.fixtime_value, timeFmt.format(new Date(fixTimeMs))));
+        arrivalText.setText(getString(R.string.arrival_value, timeFmt.format(new Date(arrivalMs))));
+        long latency = arrivalMs - fixTimeMs;
+        if (latency < 0) {
+            latency = 0;
+        }
+        latencyText.setText(getString(R.string.latency_value, latency));
+        refreshElapsedAndStatus();
+    }
+
+    @Override
+    public void onGpsAvailability(boolean providerEnabled, boolean permissionGranted) {
+        gpsProviderEnabled = providerEnabled;
+        permGranted = permissionGranted;
+        permWarning.setVisibility(permissionGranted ? View.GONE : View.VISIBLE);
+        refreshElapsedAndStatus();
+    }
+
+    /**
+     * Yalnızca "geçen süre" etiketini ve GPS bağlantı durumunu tazeler.
+     * Konum verisi event tabanlı gelir; bu yalnızca gösterimi günceller.
+     */
+    private void refreshElapsedAndStatus() {
+        if (!permGranted) {
+            gpsStatusText.setText(R.string.gps_status_noperm);
+            gpsStatusText.setTextColor(0xFFFF7043);
+            elapsedText.setText(R.string.elapsed_initial);
+            return;
+        }
+        if (!hasFix) {
+            gpsStatusText.setText(gpsProviderEnabled
+                    ? R.string.gps_status_waiting : R.string.gps_status_disabled);
+            gpsStatusText.setTextColor(0xFFFFB74D);
+            return;
+        }
+        float ageSec = (System.currentTimeMillis() - lastArrivalMs) / 1000f;
+        elapsedText.setText(getString(R.string.elapsed_value, ageSec));
+
+        if (!gpsProviderEnabled) {
+            gpsStatusText.setText(R.string.gps_status_disabled);
+            gpsStatusText.setTextColor(0xFFFF7043);
+        } else if ((System.currentTimeMillis() - lastArrivalMs) > STALE_MS) {
+            gpsStatusText.setText(R.string.gps_status_nosignal);
+            gpsStatusText.setTextColor(0xFFFF7043);
+        } else {
+            gpsStatusText.setText(R.string.gps_status_connected);
+            gpsStatusText.setTextColor(0xFF4CAF50);
+        }
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode,
                                            @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        // Bildirim izni reddedilse bile servis çalışır; yalnızca bildirim
-        // görünmeyebilir. Ek işlem gerekmez.
+        if (requestCode == REQ_LOCATION) {
+            updatePermWarning();
+            if (hasLocationPermission() && bound && service != null && service.isRunning()) {
+                // İzin verildi ve yakalama sürüyor: GPS'i hemen başlat.
+                service.enableLocation();
+            }
+        }
+        // Bildirim izni reddedilse bile servis çalışır; ek işlem gerekmez.
     }
 }
