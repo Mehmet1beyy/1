@@ -1,0 +1,1 @@
+# MapCast: varsayılan kurallar yeterli.

@@ -1,0 +1,16 @@
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+*.apk
+*.aab
+
+# .NET / WPF
+desktop/**/bin/
+desktop/**/obj/
+
+# Genel
+.DS_Store
+*.log
