@@ -201,6 +201,50 @@
                 android:textSize="15sp" />
         </LinearLayout>
 
+        <!-- WiFi yayını kartı -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="#182029"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WiFi Yayını (laptopa canlı)"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/streamButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Yayını Başlat" />
+
+            <TextView
+                android:id="@+id/streamInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:fontFamily="monospace"
+                android:text="Önce sanal ekranı başlat."
+                android:textColor="#CFD8DC"
+                android:textIsSelectable="true"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Laptopta MapCastViewer'ı aç → Telefon IP + PIN gir → Yayını Aç (aynı WiFi)."
+                android:textColor="#607D8B"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <!-- Kontroller -->
         <LinearLayout
             android:layout_width="match_parent"

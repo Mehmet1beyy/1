@@ -34,7 +34,17 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
+import com.ivd.virtualdisplay.stream.StreamEncoder;
+import com.ivd.virtualdisplay.stream.TcpStreamServer;
+
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -56,6 +66,11 @@ public class VirtualDisplayService extends Service {
     public static final int WIDTH = 1280;
     public static final int HEIGHT = 720;
     private static final int DENSITY_DPI = 320;
+
+    // WiFi yayını
+    public static final int STREAM_PORT = 8080;
+    private static final int STREAM_FPS = 20;
+    private static final int STREAM_BITRATE = 4_000_000;
 
     private static final String CHANNEL_ID = "ivd_channel";
     private static final int NOTIF_ID = 1001;
@@ -80,6 +95,13 @@ public class VirtualDisplayService extends Service {
     private Bitmap readerBitmap; // ImageReader düzlemi için yeniden kullanılan bitmap
     private long lastPreviewMs = 0;
     private long lastStatsMs = 0;
+
+    // --- WiFi yayını ---
+    private StreamEncoder streamEncoder;
+    private TcpStreamServer streamServer;
+    private volatile boolean streaming = false;
+    private String streamPin = "";
+    private long lastStreamMs = 0;
 
     // --- GPS (olay tabanlı) ---
     private LocationManager locationManager;
@@ -254,6 +276,108 @@ public class VirtualDisplayService extends Service {
         // Foreground servis tipini location içerecek şekilde güncelle.
         startForegroundInternal(true);
         startLocation();
+    }
+
+    // ----- WiFi yayını (laptopa canlı) -----
+
+    /** Sanal ekran çalışıyorsa yayını başlatır. */
+    public synchronized void startStreaming() {
+        if (streaming || !running) {
+            return;
+        }
+        final String pin = String.valueOf(1000 + new Random().nextInt(9000));
+        TcpStreamServer server = new TcpStreamServer(STREAM_PORT, pin, new TcpStreamServer.Callback() {
+            @Override
+            public void onClientCount(int n) {
+                // UI, 500 ms'lik tiker ile getStreamSummary() okuyor.
+            }
+            @Override
+            public void requestKeyframe() {
+                StreamEncoder e = streamEncoder;
+                if (e != null) {
+                    e.requestKeyframe();
+                }
+            }
+        });
+        StreamEncoder enc = new StreamEncoder(WIDTH, HEIGHT, STREAM_FPS, STREAM_BITRATE, server);
+        try {
+            server.start();
+            enc.start();
+        } catch (Exception e) {
+            Log.e(TAG, "Yayın başlatılamadı", e);
+            try { enc.stop(); } catch (Exception ignored) {}
+            try { server.stop(); } catch (Exception ignored) {}
+            return;
+        }
+        streamServer = server;
+        streamEncoder = enc;
+        streamPin = pin;
+        streaming = true;
+        Log.i(TAG, "Yayın başladı, pin=" + pin);
+    }
+
+    public synchronized void stopStreaming() {
+        streaming = false;
+        StreamEncoder e = streamEncoder;
+        TcpStreamServer s = streamServer;
+        streamEncoder = null;
+        streamServer = null;
+        if (e != null) e.stop();
+        if (s != null) s.stop();
+        Log.i(TAG, "Yayın durduruldu");
+    }
+
+    public boolean isStreaming() {
+        return streaming;
+    }
+
+    /** UI'de gösterilecek çok satırlı yayın özeti (IP + PIN + sayaçlar). */
+    public String getStreamSummary() {
+        if (!streaming) {
+            return "";
+        }
+        TcpStreamServer s = streamServer;
+        List<String> ips = localIps();
+        String primary = primaryIp(ips);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Yayında  •  PIN: ").append(streamPin)
+                .append("  •  Port: ").append(STREAM_PORT).append('\n');
+        sb.append("Telefon IP: ").append(primary == null ? "?" : primary).append('\n');
+        if (ips.size() > 1) {
+            sb.append("Tüm IP'ler: ").append(String.join("  ", ips)).append('\n');
+        }
+        if (s != null) {
+            sb.append("Kodlanan: ").append(s.getFrames()).append(" kare  •  Gönderilen: ")
+                    .append(s.getBytes() / 1024).append(" KB  •  İstemci: ").append(s.getClientCount());
+        }
+        return sb.toString();
+    }
+
+    private List<String> localIps() {
+        List<String> out = new ArrayList<>();
+        try {
+            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+            while (ifaces.hasMoreElements()) {
+                NetworkInterface ni = ifaces.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress a = addrs.nextElement();
+                    if (a instanceof Inet4Address && !a.isLoopbackAddress()) {
+                        String h = a.getHostAddress();
+                        if (h != null && !out.contains(h)) out.add(h);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    private String primaryIp(List<String> a) {
+        for (String s : a) if (s.startsWith("192.168.")) return s;
+        for (String s : a) if (s.startsWith("10.") || s.startsWith("172.")) return s;
+        return a.isEmpty() ? null : a.get(0);
     }
 
     // ----- GPS (olay tabanlı) -----
@@ -464,6 +588,16 @@ public class VirtualDisplayService extends Service {
                 }
             }
 
+            // Yayın açıksa kareyi kodlayıcıya ver (~STREAM_FPS ile sınırlı).
+            StreamEncoder enc = streamEncoder;
+            if (streaming && enc != null && (ms - lastStreamMs) >= (1000L / STREAM_FPS)) {
+                lastStreamMs = ms;
+                Bitmap sb = toBitmap(image);
+                if (sb != null) {
+                    enc.submitBitmap(sb);
+                }
+            }
+
             // İstatistikleri ~4 kez/sn güncelle.
             if ((ms - lastStatsMs) >= 250) {
                 lastStatsMs = ms;
@@ -525,6 +659,9 @@ public class VirtualDisplayService extends Service {
 
     private synchronized void stopCapture() {
         running = false;
+
+        // Yayını da durdur (açıksa).
+        stopStreaming();
 
         // GPS dinleyicilerini düzgün kapat.
         stopLocation();

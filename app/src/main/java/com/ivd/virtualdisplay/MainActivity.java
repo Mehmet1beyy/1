@@ -51,6 +51,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private Button zoomInButton;
     private Button zoomOutButton;
     private Button recenterButton;
+    private Button streamButton;
+    private TextView streamInfo;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
@@ -90,6 +92,7 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         @Override
         public void run() {
             refreshElapsedAndStatus();
+            refreshStreamInfo();
             uiTicker.postDelayed(this, 500L);
         }
     };
@@ -126,6 +129,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         zoomInButton = findViewById(R.id.zoomInButton);
         zoomOutButton = findViewById(R.id.zoomOutButton);
         recenterButton = findViewById(R.id.recenterButton);
+        streamButton = findViewById(R.id.streamButton);
+        streamInfo = findViewById(R.id.streamInfo);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
@@ -162,6 +167,7 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                 service.recenter();
             }
         });
+        streamButton.setOnClickListener(v -> onStreamClicked());
 
         // Önizlemeye dokunuş -> sanal ekrandaki haritaya aktar.
         preview.setOnTouchListener(this::onPreviewTouch);
@@ -238,6 +244,36 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         zoomInButton.setEnabled(running);
         zoomOutButton.setEnabled(running);
         recenterButton.setEnabled(running);
+        streamButton.setEnabled(running);
+        refreshStreamInfo();
+    }
+
+    private void onStreamClicked() {
+        if (!bound || service == null) {
+            return;
+        }
+        if (service.isStreaming()) {
+            service.stopStreaming();
+        } else {
+            if (!service.isRunning()) {
+                streamInfo.setText("Önce 'Başlat' ile sanal ekranı çalıştır.");
+                return;
+            }
+            service.startStreaming();
+        }
+        refreshStreamInfo();
+    }
+
+    private void refreshStreamInfo() {
+        boolean streaming = bound && service != null && service.isStreaming();
+        streamButton.setText(streaming ? "Yayını Durdur" : "Yayını Başlat");
+        if (streaming) {
+            streamInfo.setText(service.getStreamSummary());
+        } else if (bound && service != null && service.isRunning()) {
+            streamInfo.setText("Kapalı — başlatmak için 'Yayını Başlat'a dokun.");
+        } else {
+            streamInfo.setText("Önce sanal ekranı başlat.");
+        }
     }
 
     private void ensureNotificationPermission() {
