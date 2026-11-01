@@ -57,12 +57,15 @@ public class MapPresentation extends Presentation {
     // Mini "masaüstü": uygulama kapsayıcısı + WebView + alt görev çubuğu.
     private FrameLayout root;
     private FrameLayout appContainer;
+    private View webApp;             // araç çubuğu + WebView
     private WebView webView;
+    private TextView urlBar;
     private View tabMap;
     private View tabWeb;
     private int currentApp = 0;      // 0 = harita, 1 = web
     private boolean webLoaded = false;
     private String webUrl = "https://www.google.com";
+    private long gestureDownTime = 0;
 
     // Gerçek GPS işaretçisi (ilk düzeltmede oluşturulur).
     private Marker locationMarker;
@@ -130,23 +133,15 @@ public class MapPresentation extends Presentation {
             Log.e(TAG, "Harita başlatılamadı (çevrimdışı olabilir)", t);
         }
 
-        // İkinci uygulama: WebView (başlangıçta gizli, ilk geçişte yüklenir).
+        // İkinci uygulama: araç çubuklu tarayıcı (başlangıçta gizli).
         try {
-            webView = new WebView(getContext());
-            WebSettings ws = webView.getSettings();
-            ws.setJavaScriptEnabled(true);
-            ws.setDomStorageEnabled(true);
-            ws.setUseWideViewPort(true);
-            ws.setLoadWithOverviewMode(true);
-            ws.setBuiltInZoomControls(true);
-            ws.setDisplayZoomControls(false);
-            webView.setWebViewClient(new WebViewClient());
-            webView.setVisibility(View.GONE);
-            appContainer.addView(webView, new FrameLayout.LayoutParams(
+            webApp = buildWebApp();
+            webApp.setVisibility(View.GONE);
+            appContainer.addView(webApp, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
         } catch (Throwable t) {
-            Log.e(TAG, "WebView oluşturulamadı", t);
+            Log.e(TAG, "Tarayıcı oluşturulamadı", t);
         }
 
         // HUD her zaman en üstte: saat/sayaç + sürekli kare üretimi (hangi uygulama
@@ -229,12 +224,12 @@ public class MapPresentation extends Presentation {
             if (mapView != null) {
                 mapView.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
             }
-            if (webView != null) {
-                webView.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
-                if (index == 1 && !webLoaded) {
-                    webLoaded = true;
-                    webView.loadUrl(webUrl);
-                }
+            if (webApp != null) {
+                webApp.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
+            }
+            if (index == 1 && webView != null && !webLoaded) {
+                webLoaded = true;
+                webView.loadUrl(webUrl);
             }
             highlightTab(tabMap, index == 0);
             highlightTab(tabWeb, index == 1);
@@ -252,29 +247,132 @@ public class MapPresentation extends Presentation {
         }
     }
 
-    /** Laptop URL'yi ayarlayabilir (bir sonraki web geçişinde yüklenir). */
-    public void setWebUrl(String url) {
-        this.webUrl = url;
-        webLoaded = false;
-        if (currentApp == 1 && webView != null) {
+    /** Araç çubuklu tarayıcı uygulamasını oluşturur (üstte ◀ ▶ ⟳ + adres, altta WebView). */
+    private View buildWebApp() {
+        LinearLayout col = new LinearLayout(getContext());
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setBackgroundColor(Color.parseColor("#101820"));
+
+        LinearLayout toolbar = new LinearLayout(getContext());
+        toolbar.setOrientation(LinearLayout.HORIZONTAL);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setBackgroundColor(Color.parseColor("#182029"));
+        int pad = dp(6);
+        toolbar.setPadding(pad, pad, pad, pad);
+
+        View back = navButton("◀");
+        View fwd = navButton("▶");
+        View reload = navButton("⟳");
+
+        urlBar = new TextView(getContext());
+        urlBar.setText(webUrl);
+        urlBar.setTextColor(Color.WHITE);
+        urlBar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        urlBar.setSingleLine(true);
+        urlBar.setBackgroundColor(Color.parseColor("#0E1512"));
+        urlBar.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        ulp.setMargins(dp(6), 0, 0, 0);
+        urlBar.setLayoutParams(ulp);
+
+        toolbar.addView(back);
+        toolbar.addView(fwd);
+        toolbar.addView(reload);
+        toolbar.addView(urlBar);
+
+        webView = new WebView(getContext());
+        WebSettings ws = webView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setUseWideViewPort(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setBuiltInZoomControls(true);
+        ws.setDisplayZoomControls(false);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView v, String url, android.graphics.Bitmap favicon) {
+                if (urlBar != null) urlBar.setText(url);
+            }
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                if (urlBar != null) urlBar.setText(url);
+            }
+        });
+
+        back.setOnClickListener(v -> { if (webView != null && webView.canGoBack()) webView.goBack(); });
+        fwd.setOnClickListener(v -> { if (webView != null && webView.canGoForward()) webView.goForward(); });
+        reload.setOnClickListener(v -> { if (webView != null) webView.reload(); });
+
+        col.addView(toolbar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        col.addView(webView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        return col;
+    }
+
+    private View navButton(String label) {
+        TextView b = new TextView(getContext());
+        b.setText(label);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setGravity(Gravity.CENTER);
+        b.setClickable(true);
+        b.setFocusable(true);
+        int p = dp(10);
+        b.setPadding(p, dp(4), p, dp(4));
+        return b;
+    }
+
+    /** Telefon/laptop adres çubuğundan URL yükler ve web uygulamasına geçer. */
+    public void loadWebUrl(String url) {
+        try {
+            if (url == null || url.trim().isEmpty()) return;
+            String u = url.trim();
+            if (!u.startsWith("http://") && !u.startsWith("https://")) {
+                u = "https://" + u;
+            }
+            webUrl = u;
             webLoaded = true;
-            webView.loadUrl(url);
+            if (webView != null) webView.loadUrl(u);
+            switchApp(1);
+        } catch (Throwable t) {
+            Log.e(TAG, "loadWebUrl hatası", t);
         }
     }
 
-    /** Laptop tıklaması: (x,y) sanal ekran koordinatına dokunma gönder (taskbar vb.). */
-    public void tapAt(int x, int y) {
+    /**
+     * Laptoptan gelen dokunma olayı: action 0=down,1=move,2=up. (x,y) sanal ekran
+     * koordinatı. Köke gönderilir → öndeki uygulama (harita/web/taskbar) doğal işler.
+     */
+    public void injectTouch(int action, int x, int y) {
         try {
             if (root == null) return;
-            long t = SystemClock.uptimeMillis();
-            MotionEvent down = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0);
-            root.dispatchTouchEvent(down);
-            down.recycle();
-            MotionEvent up = MotionEvent.obtain(t, t + 12, MotionEvent.ACTION_UP, x, y, 0);
-            root.dispatchTouchEvent(up);
-            up.recycle();
-        } catch (Throwable th) {
-            Log.e(TAG, "tapAt hatası", th);
+            int a = action == 0 ? MotionEvent.ACTION_DOWN
+                    : action == 1 ? MotionEvent.ACTION_MOVE
+                    : MotionEvent.ACTION_UP;
+            long now = SystemClock.uptimeMillis();
+            if (a == MotionEvent.ACTION_DOWN) gestureDownTime = now;
+            if (a == MotionEvent.ACTION_MOVE) autoFollow = false;
+            MotionEvent ev = MotionEvent.obtain(gestureDownTime, now, a, x, y, 0);
+            root.dispatchTouchEvent(ev);
+            ev.recycle();
+        } catch (Throwable t) {
+            Log.e(TAG, "injectTouch hatası", t);
+        }
+    }
+
+    /** Fare tekerleği: web'de sayfayı kaydır, haritada yakınlaştır/uzaklaştır. */
+    public void wheel(int dir) {
+        try {
+            if (currentApp == 1 && webView != null) {
+                webView.scrollBy(0, dir > 0 ? -180 : 180);
+            } else if (mapView != null) {
+                if (dir > 0) mapView.getController().zoomIn();
+                else mapView.getController().zoomOut();
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "wheel hatası", t);
         }
     }
 

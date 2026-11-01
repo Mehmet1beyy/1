@@ -32,6 +32,11 @@
             <Button x:Name="BtnPlay" Content="Yayını Aç" Click="BtnPlay_Click"
                     Margin="0,8,0,0" Padding="8,6" Background="#1E8E5A" Foreground="#0E1512" FontWeight="Bold" />
 
+            <TextBlock Text="3) Web adresi (sanal ekrana)" Foreground="#7CE0B0" FontWeight="Bold" Margin="0,16,0,4" />
+            <TextBox x:Name="TxtUrl" Text="youtube.com" />
+            <Button x:Name="BtnGo" Content="Web'i Aç" Click="BtnGo_Click"
+                    Margin="0,6,0,0" Padding="8,4" Background="#1E8E5A" Foreground="#0E1512" />
+
             <TextBlock x:Name="TxtStatus" Text="Hazır" Foreground="#8FB3A3"
                        TextWrapping="Wrap" Margin="0,16,0,0" />
         </StackPanel>

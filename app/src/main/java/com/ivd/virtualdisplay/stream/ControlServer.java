@@ -20,9 +20,10 @@ public class ControlServer {
     private static final String TAG = "IVD/ControlServer";
 
     public interface Handler {
-        void onPan(int dx, int dy);
-        void onZoom(int dir);
-        void onTap(int x, int y);
+        /** action: 0=down, 1=move, 2=up; (x,y) sanal ekran koordinatı. */
+        void onTouch(int action, int x, int y);
+        void onWheel(int dir);
+        void onUrl(String url);
     }
 
     private final int port;
@@ -90,20 +91,21 @@ public class ControlServer {
         try {
             String[] p = line.split(" ");
             switch (p[0]) {
-                case "PAN":
-                    if (p.length >= 3) {
-                        handler.onPan(Integer.parseInt(p[1]), Integer.parseInt(p[2]));
-                    }
+                case "DOWN":
+                    if (p.length >= 3) handler.onTouch(0, Integer.parseInt(p[1]), Integer.parseInt(p[2]));
                     break;
-                case "ZOOM":
-                    if (p.length >= 2) {
-                        handler.onZoom(Integer.parseInt(p[1]));
-                    }
+                case "MOVE":
+                    if (p.length >= 3) handler.onTouch(1, Integer.parseInt(p[1]), Integer.parseInt(p[2]));
                     break;
-                case "TAP":
-                    if (p.length >= 3) {
-                        handler.onTap(Integer.parseInt(p[1]), Integer.parseInt(p[2]));
-                    }
+                case "UP":
+                    if (p.length >= 3) handler.onTouch(2, Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+                    break;
+                case "WHEEL":
+                    if (p.length >= 2) handler.onWheel(Integer.parseInt(p[1]));
+                    break;
+                case "URL":
+                    int sp = line.indexOf(' ');
+                    if (sp > 0) handler.onUrl(line.substring(sp + 1).trim());
                     break;
                 default:
                     break;

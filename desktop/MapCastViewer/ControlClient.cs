@@ -58,9 +58,11 @@ public sealed class ControlClient : IDisposable
         }
     }
 
-    public void Pan(int dx, int dy) => Send($"PAN {dx} {dy}");
-    public void Zoom(int dir) => Send($"ZOOM {dir}");
-    public void Tap(int x, int y) => Send($"TAP {x} {y}");
+    public void Down(int x, int y) => Send($"DOWN {x} {y}");
+    public void Move(int x, int y) => Send($"MOVE {x} {y}");
+    public void Up(int x, int y) => Send($"UP {x} {y}");
+    public void Wheel(int dir) => Send($"WHEEL {dir}");
+    public void Url(string url) => Send($"URL {url}");
 
     public void Dispose()
     {

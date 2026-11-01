@@ -23,8 +23,6 @@ public partial class MainWindow : Window
     private const int ControlPort = 8081;
     private ControlClient? _control;
     private bool _dragging;
-    private bool _dragMoved;
-    private Point _lastPoint;
 
     public MainWindow()
     {
@@ -83,23 +81,23 @@ public partial class MainWindow : Window
 
     // ----- Laptoptan harita kontrolü -----
 
+    // Fare sanal ekrana gerçek dokunma gibi iletilir: öndeki uygulama (harita/web/
+    // taskbar) doğal davranır. Tıklama = down+up, sürükleme = down+move...+up.
     private void InputLayer_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        _dragging = true;
-        _dragMoved = false;
-        _lastPoint = e.GetPosition(InputLayer);
-        InputLayer.CaptureMouse();
+        if (MapPoint(e.GetPosition(InputLayer), out int mx, out int my))
+        {
+            _dragging = true;
+            InputLayer.CaptureMouse();
+            _control?.Down(mx, my);
+        }
     }
 
     private void InputLayer_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (_dragging && !_dragMoved)
+        if (_dragging && MapPoint(e.GetPosition(InputLayer), out int mx, out int my))
         {
-            // Sürükleme olmadan bırakıldı = tıklama → sanal ekrana TAP (taskbar vb.).
-            if (MapPoint(e.GetPosition(InputLayer), out int mx, out int my))
-            {
-                _control?.Tap(mx, my);
-            }
+            _control?.Up(mx, my);
         }
         _dragging = false;
         InputLayer.ReleaseMouseCapture();
@@ -108,22 +106,9 @@ public partial class MainWindow : Window
     private void InputLayer_MouseMove(object sender, MouseEventArgs e)
     {
         if (!_dragging) return;
-        var p = e.GetPosition(InputLayer);
-        double dxs = p.X - _lastPoint.X;
-        double dys = p.Y - _lastPoint.Y;
-
-        double w = InputLayer.ActualWidth, h = InputLayer.ActualHeight;
-        if (w <= 0 || h <= 0) return;
-        // Video 1280x720 olarak harf kutusuyla sığdırılır; ekran pikselini harita pikseline çevir.
-        double fit = Math.Min(w / 1280.0, h / 720.0);
-        if (fit <= 0) return;
-        int dx = (int)Math.Round(dxs / fit);
-        int dy = (int)Math.Round(dys / fit);
-        if (dx != 0 || dy != 0)
+        if (MapPoint(e.GetPosition(InputLayer), out int mx, out int my))
         {
-            _dragMoved = true;
-            _lastPoint = p;
-            _control?.Pan(dx, dy);
+            _control?.Move(mx, my);
         }
     }
 
@@ -146,7 +131,20 @@ public partial class MainWindow : Window
 
     private void InputLayer_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        _control?.Zoom(e.Delta > 0 ? 1 : -1);
+        _control?.Wheel(e.Delta > 0 ? 1 : -1);
+    }
+
+    private void BtnGo_Click(object sender, RoutedEventArgs e)
+    {
+        var url = TxtUrl.Text.Trim();
+        if (string.IsNullOrWhiteSpace(url)) return;
+        if (_control is null || !_control.Connected)
+        {
+            TxtStatus.Text = "Önce 'Yayını Aç' (kontrol kanalı gerekli).";
+            return;
+        }
+        _control.Url(url);
+        TxtStatus.Text = "Web açılıyor: " + url;
     }
 
     private async void BtnScan_Click(object sender, RoutedEventArgs e)

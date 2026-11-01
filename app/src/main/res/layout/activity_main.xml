@@ -55,6 +55,34 @@
                 android:text="Ara" />
         </LinearLayout>
 
+        <!-- Web adresi (sanal ekrandaki tarayıcıya) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/webInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#182029"
+                android:hint="Web adresi (örn. youtube.com)"
+                android:imeOptions="actionGo"
+                android:inputType="textUri"
+                android:padding="12dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#607D8B" />
+
+            <Button
+                android:id="@+id/webGoButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Git" />
+        </LinearLayout>
+
         <!-- Canlı önizleme (sanal ekranın kopyası) -->
         <ImageView
             android:id="@+id/preview"

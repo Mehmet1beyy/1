@@ -66,6 +66,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private TextView streamInfo;
     private EditText searchInput;
     private Button searchButton;
+    private EditText webInput;
+    private Button webGoButton;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
@@ -146,6 +148,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         streamInfo = findViewById(R.id.streamInfo);
         searchInput = findViewById(R.id.searchInput);
         searchButton = findViewById(R.id.searchButton);
+        webInput = findViewById(R.id.webInput);
+        webGoButton = findViewById(R.id.webGoButton);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
@@ -186,6 +190,11 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         searchButton.setOnClickListener(v -> doSearch());
         searchInput.setOnEditorActionListener((v, actionId, event) -> {
             doSearch();
+            return true;
+        });
+        webGoButton.setOnClickListener(v -> doWebGo());
+        webInput.setOnEditorActionListener((v, actionId, event) -> {
+            doWebGo();
             return true;
         });
 
@@ -346,6 +355,20 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                         Toast.makeText(this, "Arama hatası: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
         }).start();
+    }
+
+    /** Sanal ekrandaki tarayıcıya web adresi yükler. */
+    private void doWebGo() {
+        String u = webInput.getText().toString().trim();
+        if (u.isEmpty()) {
+            return;
+        }
+        if (!bound || service == null || !service.isRunning()) {
+            Toast.makeText(this, "Önce 'Başlat' ile ekranı aç.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        service.loadWeb(u);
+        Toast.makeText(this, "Açılıyor: " + u, Toast.LENGTH_SHORT).show();
     }
 
     private void ensureNotificationPermission() {

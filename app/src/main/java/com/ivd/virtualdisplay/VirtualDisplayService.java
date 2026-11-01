@@ -320,26 +320,24 @@ public class VirtualDisplayService extends Service {
         // Laptoptan kontrol (sürükle/zoom) kanalı.
         ControlServer cs = new ControlServer(STREAM_CTRL_PORT, pin, new ControlServer.Handler() {
             @Override
-            public void onPan(int dx, int dy) {
+            public void onTouch(int action, int x, int y) {
                 mainHandler.post(() -> {
                     MapPresentation p = presentation;
-                    if (p != null) p.panBy(dx, dy);
+                    if (p != null) p.injectTouch(action, x, y);
                 });
             }
             @Override
-            public void onZoom(int dir) {
+            public void onWheel(int dir) {
                 mainHandler.post(() -> {
                     MapPresentation p = presentation;
-                    if (p != null) {
-                        if (dir >= 0) p.zoomIn(); else p.zoomOut();
-                    }
+                    if (p != null) p.wheel(dir);
                 });
             }
             @Override
-            public void onTap(int x, int y) {
+            public void onUrl(String url) {
                 mainHandler.post(() -> {
                     MapPresentation p = presentation;
-                    if (p != null) p.tapAt(x, y);
+                    if (p != null) p.loadWebUrl(url);
                 });
             }
         });
@@ -369,6 +367,16 @@ public class VirtualDisplayService extends Service {
             MapPresentation p = presentation;
             if (p != null) {
                 p.goTo(lat, lon, label);
+            }
+        });
+    }
+
+    /** Telefon adres çubuğundan web adresi yükle (web uygulamasına geçer). */
+    public void loadWeb(String url) {
+        mainHandler.post(() -> {
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.loadWebUrl(url);
             }
         });
     }
