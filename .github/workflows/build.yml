@@ -1,0 +1,100 @@
+name: Build MapCast
+
+# APK (Android) ve EXE (Windows) çıktılarını otomatik derler.
+# - Her push/PR'da artifact olarak yükler (Actions çalışma sayfasından indirilir).
+# - Bir sürüm etiketi (v*) push edilirse ayrıca kalıcı bir Release oluşturur.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapCast-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish self-contained EXE
+        shell: pwsh
+        run: |
+          dotnet publish desktop/MapCastViewer/MapCastViewer.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false `
+            -o publish
+          Get-ChildItem publish\MapCastViewer.exe
+
+      - name: Upload EXE (klasör)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapCastViewer-win-x64
+          path: publish/**
+          retention-days: 30
+
+  release:
+    name: Yayın (yalnızca v* etiketinde)
+    needs: [android, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Paketle
+        run: |
+          cd artifacts
+          mv MapCast-APK/app-debug.apk MapCast.apk
+          zip -r MapCastViewer-win-x64.zip MapCastViewer-win-x64
+          ls -la
+
+      - name: Release oluştur
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/MapCast.apk
+            artifacts/MapCastViewer-win-x64.zip

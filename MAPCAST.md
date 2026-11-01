@@ -71,6 +71,17 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 Çalıştır → **Ağları Tara** → telefonun SSID'si → parola → **WiFi'a Bağlan** →
 IP otomatik dolar → **PIN** gir → **Yayını Aç**.
 
+## Otomatik derleme (GitHub Actions)
+
+`.github/workflows/build.yml` her push'ta ikisini de derler:
+
+- **APK** (`MapCast-APK`) ve **Windows exe klasörü** (`MapCastViewer-win-x64`)
+  → GitHub'da repo → **Actions** → ilgili çalışma → en altta **Artifacts**'tan indir.
+- exe artifact'i kendi içinde .NET + LibVLC taşır; **zip'i aç, içindeki
+  `MapCastViewer.exe`'ye çift tıkla.** Ayrıca kurulum gerekmez.
+- Bir sürüm etiketi push edersen (`git tag v1.0 && git push --tags`) kalıcı bir
+  **Release** de oluşur (APK + exe zip, herkese açık indirme linki).
+
 ## Protokol (özet)
 
 1. Telefon yerel hotspot açar (rastgele SSID + parola) ve `0.0.0.0:8080`'de TCP
