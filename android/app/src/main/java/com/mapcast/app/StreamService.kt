@@ -8,7 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -29,6 +31,15 @@ class StreamService : Service() {
     private var hotspot: HotspotManager? = null
     private var presentation: MapPresentation? = null
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val ipTicker = object : Runnable {
+        override fun run() {
+            val ips = localIps()
+            StreamState.update { it.copy(ip = primaryIp(ips) ?: it.ip, allIps = ips.joinToString("  ")) }
+            handler.postDelayed(this, 3000)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -44,11 +55,12 @@ class StreamService : Service() {
 
     private fun startStreaming() {
         val pin = Random.nextInt(1000, 9999).toString()
-        val ip = localIp() ?: "192.168.49.1"
+        val ips = localIps()
+        val ip = primaryIp(ips) ?: "192.168.49.1"
 
         StreamState.update {
-            it.copy(running = true, ip = ip, port = TCP_PORT, pin = pin,
-                clients = 0,
+            it.copy(running = true, ip = ip, allIps = ips.joinToString("  "),
+                port = TCP_PORT, pin = pin, clients = 0,
                 message = "Yayında • Laptopu AYNI WiFi'a bağla → aşağıdaki IP + PIN ile 'Yayını Aç'")
         }
 
@@ -88,7 +100,7 @@ class StreamService : Service() {
         hotspot = HotspotManager(this).also {
             it.start(object : HotspotManager.Callback {
                 override fun onStarted(ssid: String, passphrase: String) {
-                    val freshIp = localIp() ?: ip
+                    val freshIp = primaryIp(localIps()) ?: ip
                     StreamState.update { s ->
                         s.copy(ssid = ssid, pass = passphrase, ip = freshIp,
                             message = "Yayında • bu hotspot'a VEYA aynı WiFi'a bağlan, sonra IP + PIN")
@@ -107,9 +119,11 @@ class StreamService : Service() {
             })
         }
         updateNotification()
+        handler.post(ipTicker)
     }
 
     private fun stopEverything() {
+        handler.removeCallbacks(ipTicker)
         try { presentation?.dismiss() } catch (_: Exception) {}
         presentation = null
         beacon?.stop(); beacon = null
@@ -161,18 +175,24 @@ class StreamService : Service() {
             .build()
     }
 
-    private fun localIp(): String? {
+    /** Tüm yerel IPv4 adresleri (WiFi, hotspot, USB tethering vb.). */
+    private fun localIps(): List<String> {
         return try {
-            val ifaces = NetworkInterface.getNetworkInterfaces().toList()
-            // Önce hotspot arayüzünü (genelde 192.168.x.1) tercih et.
-            val addrs = ifaces.flatMap { it.inetAddresses.toList() }
+            NetworkInterface.getNetworkInterfaces().toList()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.toList() }
                 .filterIsInstance<Inet4Address>()
                 .filter { !it.isLoopbackAddress }
-                .map { it.hostAddress ?: "" }
-            addrs.firstOrNull { it.startsWith("192.168.") }
-                ?: addrs.firstOrNull { it.startsWith("10.") || it.startsWith("172.") }
-                ?: addrs.firstOrNull()
-        } catch (e: Exception) { null }
+                .mapNotNull { it.hostAddress }
+                .distinct()
+        } catch (e: Exception) { emptyList() }
+    }
+
+    // Bağlanmak için en olası adres: önce 192.168.x, sonra 10.x/172.x, sonra ilk.
+    private fun primaryIp(addrs: List<String>): String? {
+        return addrs.firstOrNull { it.startsWith("192.168.") }
+            ?: addrs.firstOrNull { it.startsWith("10.") || it.startsWith("172.") }
+            ?: addrs.firstOrNull()
     }
 
     companion object {

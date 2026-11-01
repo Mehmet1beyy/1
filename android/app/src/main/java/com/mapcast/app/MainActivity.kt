@@ -79,6 +79,11 @@ class MainActivity : AppCompatActivity() {
                 appendLine("  Adres  : ${info.ip}:${info.port}")
                 appendLine("  PIN    : ${info.pin}")
                 appendLine("  İstemci: ${info.clients}")
+                if (info.allIps.isNotBlank()) {
+                    appendLine()
+                    appendLine("Tüm IP adayları (laptopta birini dene):")
+                    appendLine("  ${info.allIps}")
+                }
             }
         }.trim()
     }

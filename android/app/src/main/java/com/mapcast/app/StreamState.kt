@@ -10,6 +10,7 @@ object StreamState {
         val ssid: String? = null,
         val pass: String? = null,
         val ip: String? = null,
+        val allIps: String = "",
         val port: Int = 0,
         val pin: String = "",
         val clients: Int = 0,

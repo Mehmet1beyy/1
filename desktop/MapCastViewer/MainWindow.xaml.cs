@@ -87,16 +87,26 @@ public partial class MainWindow : Window
 
     private async void BtnPlay_Click(object sender, RoutedEventArgs e)
     {
-        var ip = TxtIp.Text.Trim();
+        var raw = TxtIp.Text.Trim();
         var pin = TxtPin.Text.Trim();
-        if (string.IsNullOrWhiteSpace(ip)) { TxtStatus.Text = "Telefon IP'si boş."; return; }
+        if (string.IsNullOrWhiteSpace(raw)) { TxtStatus.Text = "Telefon IP'si boş."; return; }
+
+        // "192.168.39.93" veya "192.168.39.93:8080" — ikisini de kabul et.
+        string host = raw;
+        int port = _discoveredPort;
+        int idx = raw.LastIndexOf(':');
+        if (idx > 0 && idx < raw.Length - 1 && int.TryParse(raw[(idx + 1)..], out var parsedPort))
+        {
+            host = raw[..idx];
+            port = parsedPort;
+        }
 
         StopStream();
-        TxtStatus.Text = $"{ip}:{_discoveredPort} bağlanılıyor…";
+        TxtStatus.Text = $"{host}:{port} bağlanılıyor…";
         BtnPlay.IsEnabled = false;
         try
         {
-            var (client, stream) = await StreamClient.ConnectAsync(ip, _discoveredPort, pin);
+            var (client, stream) = await StreamClient.ConnectAsync(host, port, pin);
             _client = client;
             _input = new StreamMediaInput(stream);
             _media = new Media(_libVLC!, _input,
@@ -110,7 +120,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = "Bağlantı hatası: " + ex.Message;
+            TxtStatus.Text = "Bağlantı hatası: " + ex.Message +
+                "\nİpucu: Telefon IP kutusuna SADECE IP yaz (örn. 192.168.39.93). " +
+                "Laptop ile telefon AYNI WiFi ağında mı? (Aksi halde birbirlerini göremez.)";
             StopStream();
         }
         finally { BtnPlay.IsEnabled = true; }
