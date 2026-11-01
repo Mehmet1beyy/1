@@ -35,8 +35,14 @@ class StreamService : Service() {
     private val ipTicker = object : Runnable {
         override fun run() {
             val ips = localIps()
-            StreamState.update { it.copy(ip = primaryIp(ips) ?: it.ip, allIps = ips.joinToString("  ")) }
-            handler.postDelayed(this, 3000)
+            val st = server?.stats()
+            val statsText = if (st != null)
+                "Kodlanan: ${st.first} kare • Gönderilen: ${st.second / 1024} KB • İstemci: ${st.third}"
+            else ""
+            StreamState.update {
+                it.copy(ip = primaryIp(ips) ?: it.ip, allIps = ips.joinToString("  "), stats = statsText)
+            }
+            handler.postDelayed(this, 2000)
         }
     }
 

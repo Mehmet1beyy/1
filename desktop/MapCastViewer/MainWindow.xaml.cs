@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Sockets;
 using System.Windows;
 using LibVLCSharp.Shared;
@@ -15,6 +16,7 @@ public partial class MainWindow : Window
     private TcpClient? _client;
     private StreamMediaInput? _input;
     private Media? _media;
+    private StreamWriter? _logWriter;
 
     public MainWindow()
     {
@@ -28,6 +30,28 @@ public partial class MainWindow : Window
         _libVLC = new LibVLC();
         _player = new MediaPlayer(_libVLC);
         Video.MediaPlayer = _player;
+
+        // VLC loglarını exe'nin yanındaki dosyaya yaz (teşhis için)
+        try
+        {
+            var logPath = Path.Combine(AppContext.BaseDirectory, "mapcast-vlc.log");
+            _logWriter = new StreamWriter(logPath, append: false) { AutoFlush = true };
+            _libVLC.Log += (s, le) =>
+            {
+                try { _logWriter?.WriteLine($"[{le.Level}] {le.Module}: {le.Message}"); } catch { }
+            };
+        }
+        catch { }
+
+        // VLC ne yapıyor? Durumu ekrana yansıt.
+        _player.Vout += (s, ev) => Dispatcher.Invoke(() =>
+            TxtStatus.Text = $"Görüntü geldi ✓ ({ev.Count} video çıkışı).");
+        _player.EncounteredError += (s, ev) => Dispatcher.Invoke(() =>
+            TxtStatus.Text = "VLC çözme hatası. Ayrıntı: exe yanındaki mapcast-vlc.log");
+        _player.Buffering += (s, ev) => Dispatcher.Invoke(() =>
+        {
+            if (ev.Cache < 100) TxtStatus.Text = $"Arabelleğe alınıyor… %{ev.Cache:0}";
+        });
 
         _discovery.Found += (ip, port) => Dispatcher.Invoke(() =>
         {
@@ -111,8 +135,11 @@ public partial class MainWindow : Window
             _input = new StreamMediaInput(stream);
             _media = new Media(_libVLC!, _input,
                 ":demux=h264",
-                ":network-caching=150",
-                ":live-caching=150",
+                ":no-audio",
+                ":avcodec-hw=none",
+                ":h264-fps=30",
+                ":network-caching=200",
+                ":live-caching=200",
                 ":clock-jitter=0",
                 ":clock-synchro=0");
             _player!.Play(_media);
@@ -143,5 +170,6 @@ public partial class MainWindow : Window
         StopStream();
         try { _player?.Dispose(); } catch { }
         try { _libVLC?.Dispose(); } catch { }
+        try { _logWriter?.Dispose(); } catch { }
     }
 }

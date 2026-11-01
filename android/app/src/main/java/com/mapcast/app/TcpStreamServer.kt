@@ -33,6 +33,11 @@ class TcpStreamServer(
     @Volatile private var csd: ByteArray? = null
     @Volatile private var running = false
 
+    // Teşhis sayaçları
+    @Volatile private var framesEncoded = 0
+    @Volatile private var bytesSent = 0L
+    fun stats(): Triple<Int, Long, Int> = Triple(framesEncoded, bytesSent, clients.size)
+
     fun start() {
         running = true
         Thread({ acceptLoop() }, "mapcast-accept").start()
@@ -69,8 +74,7 @@ class TcpStreamServer(
             out.write("OK\n".toByteArray()); out.flush()
 
             val client = Client(sock, out)
-            // Önce codec config (SPS/PPS) gönder, sonra anahtar kare iste.
-            csd?.let { synchronized(out) { out.write(it); out.flush() } }
+            // SPS/PPS her IDR'den önce gömülü gönderilecek; şimdi anahtar kare iste.
             clients.add(client)
             onClientCount(clients.size)
             requestKeyframe()
@@ -82,26 +86,27 @@ class TcpStreamServer(
     }
 
     override fun onFormat(csd: ByteArray) {
+        // SPS/PPS'i sakla; her anahtar karenin önüne gömeceğiz (en uyumlu).
         this.csd = csd
-        broadcast(csd, isConfig = true, isKeyframe = false)
     }
 
     override fun onFrame(data: ByteArray, isKeyframe: Boolean) {
-        broadcast(data, isConfig = false, isKeyframe = isKeyframe)
-    }
-
-    private fun broadcast(data: ByteArray, isConfig: Boolean, isKeyframe: Boolean) {
+        framesEncoded++
         if (clients.isEmpty()) return
+        val head = if (isKeyframe) csd else null
         val dead = ArrayList<Client>()
         for (c in clients) {
             // Akışa yalnızca anahtar kareyle başla (GOP ortasından girme).
             if (!c.started) {
-                if (isConfig) continue
                 if (!isKeyframe) continue
                 c.started = true
             }
             try {
-                synchronized(c.out) { c.out.write(data); c.out.flush() }
+                synchronized(c.out) {
+                    if (head != null) { c.out.write(head); bytesSent += head.size }
+                    c.out.write(data); bytesSent += data.size
+                    c.out.flush()
+                }
             } catch (e: Exception) {
                 dead.add(c)
             }

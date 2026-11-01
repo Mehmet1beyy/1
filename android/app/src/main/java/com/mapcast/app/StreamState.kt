@@ -14,6 +14,7 @@ object StreamState {
         val port: Int = 0,
         val pin: String = "",
         val clients: Int = 0,
+        val stats: String = "",
         val message: String = "Hazır"
     )
 
