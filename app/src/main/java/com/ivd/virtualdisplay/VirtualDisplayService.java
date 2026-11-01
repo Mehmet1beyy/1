@@ -335,6 +335,13 @@ public class VirtualDisplayService extends Service {
                     }
                 });
             }
+            @Override
+            public void onTap(int x, int y) {
+                mainHandler.post(() -> {
+                    MapPresentation p = presentation;
+                    if (p != null) p.tapAt(x, y);
+                });
+            }
         });
         cs.start();
         controlServer = cs;

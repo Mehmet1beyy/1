@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private const int ControlPort = 8081;
     private ControlClient? _control;
     private bool _dragging;
+    private bool _dragMoved;
     private Point _lastPoint;
 
     public MainWindow()
@@ -84,14 +85,22 @@ public partial class MainWindow : Window
 
     private void InputLayer_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2) { _control?.Zoom(1); return; }
         _dragging = true;
+        _dragMoved = false;
         _lastPoint = e.GetPosition(InputLayer);
         InputLayer.CaptureMouse();
     }
 
     private void InputLayer_MouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_dragging && !_dragMoved)
+        {
+            // Sürükleme olmadan bırakıldı = tıklama → sanal ekrana TAP (taskbar vb.).
+            if (MapPoint(e.GetPosition(InputLayer), out int mx, out int my))
+            {
+                _control?.Tap(mx, my);
+            }
+        }
         _dragging = false;
         InputLayer.ReleaseMouseCapture();
     }
@@ -102,7 +111,6 @@ public partial class MainWindow : Window
         var p = e.GetPosition(InputLayer);
         double dxs = p.X - _lastPoint.X;
         double dys = p.Y - _lastPoint.Y;
-        _lastPoint = p;
 
         double w = InputLayer.ActualWidth, h = InputLayer.ActualHeight;
         if (w <= 0 || h <= 0) return;
@@ -111,7 +119,29 @@ public partial class MainWindow : Window
         if (fit <= 0) return;
         int dx = (int)Math.Round(dxs / fit);
         int dy = (int)Math.Round(dys / fit);
-        if (dx != 0 || dy != 0) _control?.Pan(dx, dy);
+        if (dx != 0 || dy != 0)
+        {
+            _dragMoved = true;
+            _lastPoint = p;
+            _control?.Pan(dx, dy);
+        }
+    }
+
+    /// <summary>Ekran noktasını 1280x720 sanal ekran koordinatına çevirir (harf kutusu dahil).</summary>
+    private bool MapPoint(Point p, out int mx, out int my)
+    {
+        mx = 0; my = 0;
+        double w = InputLayer.ActualWidth, h = InputLayer.ActualHeight;
+        if (w <= 0 || h <= 0) return false;
+        double fit = Math.Min(w / 1280.0, h / 720.0);
+        if (fit <= 0) return false;
+        double dispW = 1280.0 * fit, dispH = 720.0 * fit;
+        double offX = (w - dispW) / 2.0, offY = (h - dispH) / 2.0;
+        double x = (p.X - offX) / fit;
+        double y = (p.Y - offY) / fit;
+        mx = (int)Math.Round(Math.Max(0, Math.Min(1280, x)));
+        my = (int)Math.Round(Math.Max(0, Math.Min(720, y)));
+        return true;
     }
 
     private void InputLayer_MouseWheel(object sender, MouseWheelEventArgs e)

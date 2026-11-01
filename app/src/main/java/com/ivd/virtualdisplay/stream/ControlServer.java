@@ -22,6 +22,7 @@ public class ControlServer {
     public interface Handler {
         void onPan(int dx, int dy);
         void onZoom(int dir);
+        void onTap(int x, int y);
     }
 
     private final int port;
@@ -97,6 +98,11 @@ public class ControlServer {
                 case "ZOOM":
                     if (p.length >= 2) {
                         handler.onZoom(Integer.parseInt(p[1]));
+                    }
+                    break;
+                case "TAP":
+                    if (p.length >= 3) {
+                        handler.onTap(Integer.parseInt(p[1]), Integer.parseInt(p[2]));
                     }
                     break;
                 default:

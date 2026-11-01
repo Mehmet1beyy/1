@@ -60,6 +60,7 @@ public sealed class ControlClient : IDisposable
 
     public void Pan(int dx, int dy) => Send($"PAN {dx} {dy}");
     public void Zoom(int dir) => Send($"ZOOM {dir}");
+    public void Tap(int x, int y) => Send($"TAP {x} {y}");
 
     public void Dispose()
     {

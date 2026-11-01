@@ -5,13 +5,23 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Display;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
@@ -44,6 +54,16 @@ public class MapPresentation extends Presentation {
     private MapView mapView;
     private HudOverlayView hud;
 
+    // Mini "masaüstü": uygulama kapsayıcısı + WebView + alt görev çubuğu.
+    private FrameLayout root;
+    private FrameLayout appContainer;
+    private WebView webView;
+    private View tabMap;
+    private View tabWeb;
+    private int currentApp = 0;      // 0 = harita, 1 = web
+    private boolean webLoaded = false;
+    private String webUrl = "https://www.google.com";
+
     // Gerçek GPS işaretçisi (ilk düzeltmede oluşturulur).
     private Marker locationMarker;
     // Arama/hedef işaretçisi.
@@ -70,7 +90,11 @@ public class MapPresentation extends Presentation {
                     WindowManager.LayoutParams.MATCH_PARENT);
         }
 
-        FrameLayout root = new FrameLayout(getContext());
+        root = new FrameLayout(getContext());
+        appContainer = new FrameLayout(getContext());
+        root.addView(appContainer, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
 
         try {
             // osmdroid yapılandırması: OSM sunucuları User-Agent zorunlu kılar.
@@ -94,7 +118,7 @@ public class MapPresentation extends Presentation {
             mapView.getController().setZoom(INITIAL_CAMERA_ZOOM);
             mapView.getController().setCenter(new GeoPoint(INITIAL_CAMERA_LAT, INITIAL_CAMERA_LON));
 
-            root.addView(mapView, new FrameLayout.LayoutParams(
+            appContainer.addView(mapView, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -106,13 +130,152 @@ public class MapPresentation extends Presentation {
             Log.e(TAG, "Harita başlatılamadı (çevrimdışı olabilir)", t);
         }
 
-        // HUD her zaman eklenir: harita başlatılamasa bile sanal ekran kare üretir.
+        // İkinci uygulama: WebView (başlangıçta gizli, ilk geçişte yüklenir).
+        try {
+            webView = new WebView(getContext());
+            WebSettings ws = webView.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            ws.setUseWideViewPort(true);
+            ws.setLoadWithOverviewMode(true);
+            ws.setBuiltInZoomControls(true);
+            ws.setDisplayZoomControls(false);
+            webView.setWebViewClient(new WebViewClient());
+            webView.setVisibility(View.GONE);
+            appContainer.addView(webView, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+        } catch (Throwable t) {
+            Log.e(TAG, "WebView oluşturulamadı", t);
+        }
+
+        // HUD her zaman en üstte: saat/sayaç + sürekli kare üretimi (hangi uygulama
+        // önde olursa olsun yayın akmaya devam eder).
         hud = new HudOverlayView(getContext());
         root.addView(hud, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // Alt görev çubuğu (Windows taskbar gibi): uygulama simgeleri.
+        root.addView(buildTaskbar());
+
         setContentView(root);
+        switchApp(0);
+    }
+
+    /** Alt görev çubuğunu oluşturur: 🗺 Harita ve 🌐 Web simgeleri. */
+    private View buildTaskbar() {
+        LinearLayout bar = new LinearLayout(getContext());
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER);
+        bar.setBackgroundColor(Color.parseColor("#E6101820"));
+        int padV = dp(6);
+        bar.setPadding(0, padV, 0, padV);
+
+        tabMap = makeTab("🗺", "Harita", 0);
+        tabWeb = makeTab("🌐", "Web", 1);
+        bar.addView(tabMap);
+        bar.addView(tabWeb);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.BOTTOM;
+        bar.setLayoutParams(lp);
+        return bar;
+    }
+
+    private View makeTab(String icon, String label, int index) {
+        LinearLayout item = new LinearLayout(getContext());
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setFocusable(true);
+        int padH = dp(26), padV = dp(4);
+        item.setPadding(padH, padV, padH, padV);
+
+        TextView ic = new TextView(getContext());
+        ic.setText(icon);
+        ic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+        ic.setGravity(Gravity.CENTER);
+
+        TextView tx = new TextView(getContext());
+        tx.setText(label);
+        tx.setTextColor(Color.WHITE);
+        tx.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        tx.setGravity(Gravity.CENTER);
+
+        item.addView(ic);
+        item.addView(tx);
+
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ilp.setMargins(dp(10), 0, dp(10), 0);
+        item.setLayoutParams(ilp);
+
+        item.setOnClickListener(v -> switchApp(index));
+        return item;
+    }
+
+    private int dp(int v) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
+                getContext().getResources().getDisplayMetrics());
+    }
+
+    /** Görev çubuğundan uygulama değiştir: 0 = harita, 1 = web. */
+    public void switchApp(int index) {
+        try {
+            currentApp = index;
+            if (mapView != null) {
+                mapView.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
+            }
+            if (webView != null) {
+                webView.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
+                if (index == 1 && !webLoaded) {
+                    webLoaded = true;
+                    webView.loadUrl(webUrl);
+                }
+            }
+            highlightTab(tabMap, index == 0);
+            highlightTab(tabWeb, index == 1);
+            if (root != null) {
+                root.invalidate();
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "switchApp hatası", t);
+        }
+    }
+
+    private void highlightTab(View tab, boolean active) {
+        if (tab != null) {
+            tab.setBackgroundColor(active ? Color.parseColor("#3DDC97") : Color.TRANSPARENT);
+        }
+    }
+
+    /** Laptop URL'yi ayarlayabilir (bir sonraki web geçişinde yüklenir). */
+    public void setWebUrl(String url) {
+        this.webUrl = url;
+        webLoaded = false;
+        if (currentApp == 1 && webView != null) {
+            webLoaded = true;
+            webView.loadUrl(url);
+        }
+    }
+
+    /** Laptop tıklaması: (x,y) sanal ekran koordinatına dokunma gönder (taskbar vb.). */
+    public void tapAt(int x, int y) {
+        try {
+            if (root == null) return;
+            long t = SystemClock.uptimeMillis();
+            MotionEvent down = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0);
+            root.dispatchTouchEvent(down);
+            down.recycle();
+            MotionEvent up = MotionEvent.obtain(t, t + 12, MotionEvent.ACTION_UP, x, y, 0);
+            root.dispatchTouchEvent(up);
+            up.recycle();
+        } catch (Throwable th) {
+            Log.e(TAG, "tapAt hatası", th);
+        }
     }
 
     /** Ana uygulamadan çağrılır (ana iş parçacığında). */
@@ -180,12 +343,13 @@ public class MapPresentation extends Presentation {
      */
     public void dispatchMapTouch(android.view.MotionEvent ev) {
         try {
-            if (mapView != null && ev != null) {
+            if (root != null && ev != null) {
                 // Kullanıcı haritayı elle kaydırırsa otomatik takibi geçici kapat.
                 if (ev.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
                     autoFollow = false;
                 }
-                mapView.dispatchTouchEvent(ev);
+                // Kök görünüme gönder: görev çubuğu ve öndeki uygulama olayı alır.
+                root.dispatchTouchEvent(ev);
             }
         } catch (Throwable t) {
             Log.e(TAG, "dispatchMapTouch hatası", t);
@@ -257,6 +421,14 @@ public class MapPresentation extends Presentation {
             }
         } catch (Throwable t) {
             Log.e(TAG, "Harita serbest bırakma hatası", t);
+        }
+        try {
+            if (webView != null) {
+                webView.destroy();
+                webView = null;
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "WebView serbest bırakma hatası", t);
         }
         super.dismiss();
     }
