@@ -1,23 +1,18 @@
 package com.mapcast.app
 
-import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.os.SystemClock
-import android.view.View
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Arka planda sanal ekrana çizilen basit "harita simülasyonu".
- * Kaydırılan bir sokak ızgarası + rota üzerinde ilerleyen bir araç işareti +
- * sahte GPS/HUD bilgisi gösterir. Gerçek projende bu View'in yerine
- * kendi harita çizimini koyabilirsin; akış mantığı aynı kalır.
+ * Harita simülasyonunun çizimi — tek bir Canvas'a çizer.
+ * Hem GL render hem (istenirse) View bu fonksiyonu kullanır.
+ * Gerçek projende burayı kendi harita çiziminle değiştirebilirsin.
  */
-class MapView(context: Context) : View(context) {
-
+object MapScene {
     private val bg = Paint().apply { color = Color.parseColor("#0E1512") }
     private val grid = Paint().apply {
         color = Color.parseColor("#1C2A24"); strokeWidth = 2f; isAntiAlias = true
@@ -38,29 +33,9 @@ class MapView(context: Context) : View(context) {
         color = Color.parseColor("#8FB3A3"); textSize = 24f; isAntiAlias = true
     }
 
-    private val startMs = SystemClock.uptimeMillis()
-
-    private val tick = object : Runnable {
-        override fun run() {
-            invalidate()
-            postOnAnimation(this)
-        }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        postOnAnimation(tick)
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        removeCallbacks(tick)
-    }
-
-    override fun onDraw(canvas: Canvas) {
+    fun draw(canvas: Canvas, width: Int, height: Int, t: Double) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val t = (SystemClock.uptimeMillis() - startMs) / 1000.0
 
         canvas.drawRect(0f, 0f, w, h, bg)
 
@@ -72,7 +47,7 @@ class MapView(context: Context) : View(context) {
         var y = -offset
         while (y < h) { canvas.drawLine(0f, y, w, y, grid); y += step }
 
-        // Birkaç "ana cadde"
+        // Ana caddeler
         canvas.drawLine(0f, h * 0.35f, w, h * 0.35f, road)
         canvas.drawLine(0f, h * 0.72f, w, h * 0.72f, road)
         canvas.drawLine(w * 0.28f, 0f, w * 0.28f, h, road)

@@ -29,7 +29,6 @@ class StreamService : Service() {
     private var server: TcpStreamServer? = null
     private var beacon: DiscoveryBeacon? = null
     private var hotspot: HotspotManager? = null
-    private var presentation: MapPresentation? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val ipTicker = object : Runnable {
@@ -80,19 +79,13 @@ class StreamService : Service() {
         srv.start()
 
         val vds = VirtualDisplayStreamer(
-            context = this,
-            width = WIDTH, height = HEIGHT, dpi = DPI,
+            width = WIDTH, height = HEIGHT,
             fps = FPS, bitRate = BITRATE,
             sink = srv
         )
         streamer = vds
         try {
             vds.start()
-            vds.display?.let { display ->
-                val p = MapPresentation(this, display)
-                p.show()
-                presentation = p
-            }
         } catch (e: Exception) {
             Log.e(TAG, "streamer start failed: ${e.message}")
             StreamState.update { it.copy(message = "Kodlayıcı hatası: ${e.message}") }
@@ -130,8 +123,6 @@ class StreamService : Service() {
 
     private fun stopEverything() {
         handler.removeCallbacks(ipTicker)
-        try { presentation?.dismiss() } catch (_: Exception) {}
-        presentation = null
         beacon?.stop(); beacon = null
         hotspot?.stop(); hotspot = null
         streamer?.stop(); streamer = null
