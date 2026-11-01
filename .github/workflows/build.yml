@@ -42,3 +42,30 @@ jobs:
           name: IVD-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish self-contained EXE
+        shell: pwsh
+        run: |
+          dotnet publish desktop/MapCastViewer/MapCastViewer.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false `
+            -o publish
+          Get-ChildItem publish\MapCastViewer.exe
+
+      - name: Upload EXE (klasör)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MapCastViewer-win-x64
+          path: publish/**
+          retention-days: 30

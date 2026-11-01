@@ -34,6 +34,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
+import com.ivd.virtualdisplay.stream.ControlServer;
 import com.ivd.virtualdisplay.stream.StreamEncoder;
 import com.ivd.virtualdisplay.stream.TcpStreamServer;
 
@@ -69,6 +70,7 @@ public class VirtualDisplayService extends Service {
 
     // WiFi yayını
     public static final int STREAM_PORT = 8080;
+    public static final int STREAM_CTRL_PORT = 8081;
     private static final int STREAM_FPS = 20;
     private static final int STREAM_BITRATE = 4_000_000;
 
@@ -99,6 +101,7 @@ public class VirtualDisplayService extends Service {
     // --- WiFi yayını ---
     private StreamEncoder streamEncoder;
     private TcpStreamServer streamServer;
+    private ControlServer controlServer;
     private volatile boolean streaming = false;
     private String streamPin = "";
     private long lastStreamMs = 0;
@@ -313,6 +316,29 @@ public class VirtualDisplayService extends Service {
         streamEncoder = enc;
         streamPin = pin;
         streaming = true;
+
+        // Laptoptan kontrol (sürükle/zoom) kanalı.
+        ControlServer cs = new ControlServer(STREAM_CTRL_PORT, pin, new ControlServer.Handler() {
+            @Override
+            public void onPan(int dx, int dy) {
+                mainHandler.post(() -> {
+                    MapPresentation p = presentation;
+                    if (p != null) p.panBy(dx, dy);
+                });
+            }
+            @Override
+            public void onZoom(int dir) {
+                mainHandler.post(() -> {
+                    MapPresentation p = presentation;
+                    if (p != null) {
+                        if (dir >= 0) p.zoomIn(); else p.zoomOut();
+                    }
+                });
+            }
+        });
+        cs.start();
+        controlServer = cs;
+
         Log.i(TAG, "Yayın başladı, pin=" + pin);
     }
 
@@ -320,11 +346,24 @@ public class VirtualDisplayService extends Service {
         streaming = false;
         StreamEncoder e = streamEncoder;
         TcpStreamServer s = streamServer;
+        ControlServer c = controlServer;
         streamEncoder = null;
         streamServer = null;
+        controlServer = null;
         if (e != null) e.stop();
         if (s != null) s.stop();
+        if (c != null) c.stop();
         Log.i(TAG, "Yayın durduruldu");
+    }
+
+    /** Arama sonucu konuma git + işaretçi (ana iş parçacığına aktarılır). */
+    public void goToLocation(double lat, double lon, String label) {
+        mainHandler.post(() -> {
+            MapPresentation p = presentation;
+            if (p != null) {
+                p.goTo(lat, lon, label);
+            }
+        });
     }
 
     public boolean isStreaming() {

@@ -27,6 +27,34 @@
             android:textColor="#90A4AE"
             android:textSize="13sp" />
 
+        <!-- Konum / adres arama -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#182029"
+                android:hint="Adres veya yer ara…"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:padding="12dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#607D8B" />
+
+            <Button
+                android:id="@+id/searchButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Ara" />
+        </LinearLayout>
+
         <!-- Canlı önizleme (sanal ekranın kopyası) -->
         <ImageView
             android:id="@+id/preview"

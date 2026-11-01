@@ -16,8 +16,19 @@ import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,6 +64,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private Button recenterButton;
     private Button streamButton;
     private TextView streamInfo;
+    private EditText searchInput;
+    private Button searchButton;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
@@ -131,6 +144,8 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         recenterButton = findViewById(R.id.recenterButton);
         streamButton = findViewById(R.id.streamButton);
         streamInfo = findViewById(R.id.streamInfo);
+        searchInput = findViewById(R.id.searchInput);
+        searchButton = findViewById(R.id.searchButton);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
@@ -168,6 +183,11 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
             }
         });
         streamButton.setOnClickListener(v -> onStreamClicked());
+        searchButton.setOnClickListener(v -> doSearch());
+        searchInput.setOnEditorActionListener((v, actionId, event) -> {
+            doSearch();
+            return true;
+        });
 
         // Önizlemeye dokunuş -> sanal ekrandaki haritaya aktar.
         preview.setOnTouchListener(this::onPreviewTouch);
@@ -274,6 +294,58 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         } else {
             streamInfo.setText("Önce sanal ekranı başlat.");
         }
+    }
+
+    /** Nominatim (OSM) ile adres/yer arayıp sanal ekrandaki haritayı oraya götürür. */
+    private void doSearch() {
+        final String q = searchInput.getText().toString().trim();
+        if (q.isEmpty()) {
+            return;
+        }
+        if (!bound || service == null || !service.isRunning()) {
+            Toast.makeText(this, "Önce 'Başlat' ile haritayı aç.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "Aranıyor: " + q, Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                String url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q="
+                        + URLEncoder.encode(q, "UTF-8");
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setRequestProperty("User-Agent", "com.ivd.virtualdisplay/1.0");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                StringBuilder sb = new StringBuilder();
+                BufferedReader r = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                String ln;
+                while ((ln = r.readLine()) != null) {
+                    sb.append(ln);
+                }
+                r.close();
+                conn.disconnect();
+
+                JSONArray arr = new JSONArray(sb.toString());
+                if (arr.length() == 0) {
+                    runOnUiThread(() ->
+                            Toast.makeText(this, "Sonuç bulunamadı: " + q, Toast.LENGTH_SHORT).show());
+                    return;
+                }
+                JSONObject o = arr.getJSONObject(0);
+                final double lat = o.getDouble("lat");
+                final double lon = o.getDouble("lon");
+                final String name = o.optString("display_name", q);
+                runOnUiThread(() -> {
+                    if (service != null) {
+                        service.goToLocation(lat, lon, name);
+                    }
+                    Toast.makeText(this, "Bulundu: " + name, Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Arama hatası: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     private void ensureNotificationPermission() {

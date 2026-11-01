@@ -46,6 +46,8 @@ public class MapPresentation extends Presentation {
 
     // Gerçek GPS işaretçisi (ilk düzeltmede oluşturulur).
     private Marker locationMarker;
+    // Arama/hedef işaretçisi.
+    private Marker searchMarker;
     private Double lastLat;
     private Double lastLon;
     private boolean firstFix = true;
@@ -131,6 +133,42 @@ public class MapPresentation extends Presentation {
             }
         } catch (Throwable t) {
             Log.e(TAG, "zoomOut hatası", t);
+        }
+    }
+
+    /** Laptoptan gelen sürükleme: haritayı piksel kadar kaydır (ana iş parçacığı). */
+    public void panBy(int dx, int dy) {
+        try {
+            if (mapView != null) {
+                autoFollow = false;
+                mapView.scrollBy(-dx, -dy);
+                mapView.invalidate();
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "panBy hatası", t);
+        }
+    }
+
+    /** Arama sonucu / hedef konuma git ve işaretçi bırak (ana iş parçacığı). */
+    public void goTo(double lat, double lon, String label) {
+        try {
+            if (mapView == null) {
+                return;
+            }
+            autoFollow = false;
+            GeoPoint gp = new GeoPoint(lat, lon);
+            if (searchMarker == null) {
+                searchMarker = new Marker(mapView);
+                searchMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+                mapView.getOverlays().add(searchMarker);
+            }
+            searchMarker.setPosition(gp);
+            searchMarker.setTitle(label != null ? label : "Hedef");
+            mapView.getController().setZoom(16.0);
+            mapView.getController().animateTo(gp);
+            mapView.invalidate();
+        } catch (Throwable t) {
+            Log.e(TAG, "goTo hatası", t);
         }
     }
 
