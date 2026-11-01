@@ -43,13 +43,21 @@ public partial class MainWindow : Window
         BtnScan_Click(this, e);
     }
 
-    private void BtnScan_Click(object sender, RoutedEventArgs e)
+    private async void BtnScan_Click(object sender, RoutedEventArgs e)
     {
-        var list = WifiService.ScanSsids();
-        LstNetworks.ItemsSource = list;
-        TxtStatus.Text = list.Count > 0
-            ? $"{list.Count} ağ bulundu. Telefonun SSID'sini seç."
-            : "Ağ bulunamadı. WiFi açık mı? 'Ağları Tara'yı tekrar dene.";
+        BtnScan.IsEnabled = false;
+        TxtStatus.Text = "Ağlar taranıyor…";
+        try
+        {
+            var list = await WifiService.ScanAsync();
+            LstNetworks.ItemsSource = list;
+            TxtStatus.Text = list.Count > 0
+                ? $"{list.Count} ağ bulundu. Telefonun SSID'sini seç — VEYA bu adımı atla: " +
+                  "laptopu telefonla aynı WiFi'a bağla, aşağıya Telefon IP + PIN yazıp 'Yayını Aç'."
+                : "Ağ bulunamadı (laptopun WiFi'ı kapalı olabilir). Gerek de yok: " +
+                  "laptopu telefonla AYNI ağa bağla, aşağıya Telefon IP + PIN yazıp 'Yayını Aç'.";
+        }
+        finally { BtnScan.IsEnabled = true; }
     }
 
     private async void BtnWifiConnect_Click(object sender, RoutedEventArgs e)

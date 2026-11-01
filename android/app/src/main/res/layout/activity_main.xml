@@ -54,7 +54,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Laptopta MapCastViewer uygulamasını aç → listede bu SSID'yi seç → parolayı gir → bağlan → PIN'i gir."
+            android:text="En kolay yol: telefonu ve laptopu AYNI WiFi'a bağla → laptopta uygulamaya yukarıdaki IP + PIN'i gir → Yayını Aç. (Hotspot açılabilirse SSID/parola da kullanılabilir.)"
             android:textColor="@color/muted"
             android:textSize="13sp" />
 

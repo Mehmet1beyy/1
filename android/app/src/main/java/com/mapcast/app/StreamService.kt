@@ -48,7 +48,8 @@ class StreamService : Service() {
 
         StreamState.update {
             it.copy(running = true, ip = ip, port = TCP_PORT, pin = pin,
-                clients = 0, message = "Hotspot açılıyor…")
+                clients = 0,
+                message = "Yayında • Laptopu AYNI WiFi'a bağla → aşağıdaki IP + PIN ile 'Yayını Aç'")
         }
 
         val srv = TcpStreamServer(
@@ -90,15 +91,16 @@ class StreamService : Service() {
                     val freshIp = localIp() ?: ip
                     StreamState.update { s ->
                         s.copy(ssid = ssid, pass = passphrase, ip = freshIp,
-                            message = "Yayında • laptopu bu ağa bağla")
+                            message = "Yayında • bu hotspot'a VEYA aynı WiFi'a bağlan, sonra IP + PIN")
                     }
                     updateNotification()
                 }
                 override fun onFailed(reason: Int) {
-                    StreamState.update {
-                        it.copy(message = "Hotspot açılamadı (kod $reason). " +
-                            "Konum açık mı? İzin verildi mi? " +
-                            "Alternatif: telefon hotspot'unu elle aç, aynı ağda bağlan.")
+                    // Bu telefon hotspot açmaya izin vermedi (örn. MIUI/HyperOS).
+                    // Sorun değil: yayın zaten mevcut WiFi IP'sinde çalışıyor.
+                    StreamState.update { s ->
+                        s.copy(message = "Yayında • Hotspot bu telefonda açılamadı. " +
+                            "Laptopu AYNI WiFi'a bağla → IP ${s.ip}  PIN ${s.pin} → 'Yayını Aç'.")
                     }
                     updateNotification()
                 }

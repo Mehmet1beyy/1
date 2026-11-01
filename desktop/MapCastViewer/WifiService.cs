@@ -9,6 +9,15 @@ namespace MapCastViewer;
 /// </summary>
 public static class WifiService
 {
+    /// <summary>Gerçek bir tarama tetikler, sonra bulunan SSID'leri döndürür.</summary>
+    public static async Task<List<string>> ScanAsync()
+    {
+        try { await NativeWifi.ScanNetworksAsync(TimeSpan.FromSeconds(8)); }
+        catch { /* WiFi arayüzü yok/kapalı olabilir */ }
+        return ScanSsids();
+    }
+
+    /// <summary>Son tarama sonucundaki SSID'ler (tarama tetiklemez).</summary>
     public static List<string> ScanSsids()
     {
         try
