@@ -17,7 +17,7 @@
     <PackageReference Include="LibVLCSharp.WPF" Version="3.8.2" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.20" />
     <!-- WiFi tarama / bağlanma (Native WiFi API sarmalayıcısı) -->
-    <PackageReference Include="ManagedNativeWifi" Version="2.0.0" />
+    <PackageReference Include="ManagedNativeWifi" Version="2.1.0" />
   </ItemGroup>
 
 </Project>
