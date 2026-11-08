@@ -2,15 +2,21 @@ package com.webview.maps
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Message
 import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -54,25 +60,14 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView,
-                request: android.webkit.WebResourceRequest
+                request: WebResourceRequest
             ): Boolean {
                 val url = request.url.toString()
-                // Harita gezintisini uygulama içinde tut.
-                return if (url.startsWith("http://") || url.startsWith("https://")) {
+                // http/https haritada kalır; diğer şemalar/derin bağlantılar dışarı.
+                return if (isWebUrl(url)) {
                     false
                 } else {
-                    // tel:, mailto:, geo:, intent: gibi şemaları sistemlere bırak
-                    try {
-                        startActivity(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                request.url
-                            )
-                        )
-                        true
-                    } catch (e: Exception) {
-                        true
-                    }
+                    handleExternalUrl(url)
                 }
             }
         }
@@ -89,6 +84,39 @@ class MainActivity : AppCompatActivity() {
                     pendingGeoCallback = callback
                     requestLocationPermission()
                 }
+            }
+
+            // "Yol tarifi" gibi butonlar yeni pencere (window.open / target=_blank)
+            // açar. Hedef adresi yakalayıp ana WebView'da açarız; böylece tık boşa
+            // gitmez. Harita dışı derin bağlantılar ise ilgili uygulamaya gider.
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message
+            ): Boolean {
+                val transport = resultMsg.obj as WebView.WebViewTransport
+                val temp = WebView(this@MainActivity)
+                temp.settings.javaScriptEnabled = true
+                temp.settings.userAgentString = webView.settings.userAgentString
+                temp.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        v: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        val url = request.url.toString()
+                        if (isWebUrl(url)) {
+                            webView.loadUrl(url)
+                        } else {
+                            handleExternalUrl(url)
+                        }
+                        v.post { v.destroy() }
+                        return true
+                    }
+                }
+                transport.webView = temp
+                resultMsg.sendToTarget()
+                return true
             }
         }
 
@@ -131,12 +159,75 @@ class MainActivity : AppCompatActivity() {
             setSupportZoom(true)
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(true)
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             // Google'ın tam donanımlı mobil harita arayüzünü sunması için
             // güncel bir mobil Chrome kimliği kullanılır.
             userAgentString =
                 "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        }
+    }
+
+    private fun isWebUrl(url: String): Boolean =
+        url.startsWith("http://") || url.startsWith("https://")
+
+    /**
+     * Harita dışı bağlantıları yönetir:
+     * - "Başlat" navigasyonu: intent:// veya google.navigation: / geo: ile
+     *   kurulu Google Haritalar uygulamasına devredilir.
+     * - Kurulu uygulama yoksa intent'in browser_fallback_url'ine düşülür.
+     * - tel:, mailto:, sms: gibi şemalar ilgili uygulamaya açılır.
+     * Her durumda true döner (WebView bu adresi kendisi yüklemeye çalışmasın).
+     */
+    private fun handleExternalUrl(url: String): Boolean {
+        try {
+            if (url.startsWith("intent://")) {
+                val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                if (intent != null) {
+                    if (intent.resolveActivity(packageManager) != null) {
+                        startActivity(intent)
+                        return true
+                    }
+                    val fallback = intent.getStringExtra("browser_fallback_url")
+                    if (!fallback.isNullOrEmpty()) {
+                        webView.loadUrl(fallback)
+                        return true
+                    }
+                    // Uygulama yoksa Google Haritalar web navigasyonuna çevir.
+                    openMapsFallback(intent)
+                }
+                return true
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+            } else {
+                Toast.makeText(
+                    this,
+                    "Bu işlemi açacak bir uygulama bulunamadı",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, "Uygun uygulama bulunamadı", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            // Sessizce yut; WebView çökmez.
+        }
+        return true
+    }
+
+    /** google.navigation:q=.. gibi bir intent'i web haritası yol tarifine çevirir. */
+    private fun openMapsFallback(intent: Intent) {
+        val data = intent.dataString ?: return
+        val q = Uri.parse(data).getQueryParameter("q")
+            ?: Uri.parse(data).query
+        if (!q.isNullOrEmpty()) {
+            webView.loadUrl(
+                "https://www.google.com/maps/dir/?api=1&destination=" +
+                    Uri.encode(q)
+            )
         }
     }
 
