@@ -6,7 +6,7 @@ içinde açan basit bir Android uygulaması. Konum izni verildiğinde haritanın
 
 ## İndir / Kur
 
-- Derlenmiş APK: [`Haritalar-1.1.apk`](./Haritalar-1.1.apk) (imzalı release, ~2.5 MB)
+- Derlenmiş APK: [`Haritalar-1.2.apk`](./Haritalar-1.2.apk) (imzalı release, ~2.5 MB)
 - Telefona kopyalayıp dosyaya dokunarak kurabilirsiniz. İlk kurulumda
   "Bilinmeyen kaynaklara izin ver" uyarısını onaylamanız gerekebilir.
 
@@ -19,9 +19,13 @@ içinde açan basit bir Android uygulaması. Konum izni verildiğinde haritanın
 - JavaScript, DOM storage, yakınlaştırma, ekran döndürme desteği.
 - **"Yol tarifi"** gibi yeni pencere açan butonlar ana ekranda açılır
   (çok pencere + `onCreateWindow` desteği).
-- **"Başlat"** navigasyonu `intent://` / `geo:` derin bağlantısıyla kurulu
-  Google Haritalar uygulamasına devredilir; uygulama yoksa web yol tarifine düşer.
-- `tel:`, `geo:`, `mailto:` gibi bağlantılar ilgili sistem uygulamasına açılır.
+- **Uygulamadan dışarı atlama yok:** "Başlat" ve navigasyon derin bağlantıları
+  (`intent://`, `geo:`, `google.navigation:`, `comgooglemaps:`) başka uygulamaya
+  devredilmez; eşdeğer bir Google Haritalar web yol-tarifi adresine çevrilip
+  aynı WebView içinde açılır. (Canlı sesli turn-by-turn navigasyon Google'ın web
+  sürümünde bulunmadığından verilmez; rota ve adım listesi apk içinde gösterilir.)
+- Yalnızca apk içinde karşılığı olmayan `tel:`, `sms:`, `mailto:` bağlantıları
+  ilgili sistem uygulamasına açılır.
 
 ## Teknik bilgiler
 

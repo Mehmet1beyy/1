@@ -173,42 +173,50 @@ class MainActivity : AppCompatActivity() {
         url.startsWith("http://") || url.startsWith("https://")
 
     /**
-     * Harita dışı bağlantıları yönetir:
-     * - "Başlat" navigasyonu: intent:// veya google.navigation: / geo: ile
-     *   kurulu Google Haritalar uygulamasına devredilir.
-     * - Kurulu uygulama yoksa intent'in browser_fallback_url'ine düşülür.
-     * - tel:, mailto:, sms: gibi şemalar ilgili uygulamaya açılır.
-     * Her durumda true döner (WebView bu adresi kendisi yüklemeye çalışmasın).
+     * Harita dışı bağlantıları UYGULAMA İÇİNDE tutar.
+     *
+     * "Başlat"/navigasyon ve konum derin bağlantıları (intent://, geo:,
+     * google.navigation:, comgooglemaps:) başka uygulamaya DEVREDİLMEZ;
+     * eşdeğer bir Google Haritalar web adresine çevrilip aynı WebView'da açılır.
+     * Böylece uygulamadan dışarı atlama olmaz.
+     *
+     * Yalnızca apk içinde karşılığı olmayan tel:/sms:/mailto: gibi şemalar
+     * ilgili sistem uygulamasına açılır (WebView'da telefon araması yapılamaz).
+     * Her durumda true döner; WebView bu adresi kendisi yüklemeye çalışmaz.
      */
     private fun handleExternalUrl(url: String): Boolean {
         try {
-            if (url.startsWith("intent://")) {
+            // 1) intent:// — içindeki asıl adresi/koordinatı çıkar, apk içinde aç.
+            if (url.startsWith("intent://", ignoreCase = true)) {
                 val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-                if (intent != null) {
-                    if (intent.resolveActivity(packageManager) != null) {
-                        startActivity(intent)
-                        return true
-                    }
-                    val fallback = intent.getStringExtra("browser_fallback_url")
-                    if (!fallback.isNullOrEmpty()) {
-                        webView.loadUrl(fallback)
-                        return true
-                    }
-                    // Uygulama yoksa Google Haritalar web navigasyonuna çevir.
-                    openMapsFallback(intent)
+                val data = intent?.dataString
+                val fallback = intent?.getStringExtra("browser_fallback_url")
+                val inApp = when {
+                    data != null && isWebUrl(data) -> data
+                    data != null -> toInAppMapsUrl(data)
+                    !fallback.isNullOrEmpty() -> fallback
+                    else -> null
                 }
+                if (inApp != null) webView.loadUrl(inApp)
+                // Çevrilemeyen intent'leri yok say (dışarı atlamamak için).
                 return true
             }
 
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            if (intent.resolveActivity(packageManager) != null) {
-                startActivity(intent)
-            } else {
-                Toast.makeText(
-                    this,
-                    "Bu işlemi açacak bir uygulama bulunamadı",
-                    Toast.LENGTH_SHORT
-                ).show()
+            when (Uri.parse(url).scheme?.lowercase()) {
+                "geo", "google.navigation", "comgooglemaps", "maps" -> {
+                    val inApp = toInAppMapsUrl(url)
+                    if (inApp != null) webView.loadUrl(inApp)
+                    return true
+                }
+                "tel", "sms", "smsto", "mailto" -> {
+                    // apk içinde karşılığı yok → ilgili uygulamaya aç.
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    return true
+                }
+                else -> {
+                    // Bilinmeyen şema: dışarı atlamamak için yok say.
+                    return true
+                }
             }
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "Uygun uygulama bulunamadı", Toast.LENGTH_SHORT).show()
@@ -218,17 +226,72 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    /** google.navigation:q=.. gibi bir intent'i web haritası yol tarifine çevirir. */
-    private fun openMapsFallback(intent: Intent) {
-        val data = intent.dataString ?: return
-        val q = Uri.parse(data).getQueryParameter("q")
-            ?: Uri.parse(data).query
-        if (!q.isNullOrEmpty()) {
-            webView.loadUrl(
-                "https://www.google.com/maps/dir/?api=1&destination=" +
-                    Uri.encode(q)
-            )
+    /**
+     * geo: / google.navigation: / comgooglemaps: gibi bir harita derin
+     * bağlantısını, aynı WebView'da açılabilen bir Google Haritalar web
+     * adresine çevirir. Çevrilemezse null döner.
+     */
+    private fun toInAppMapsUrl(raw: String): String? {
+        try {
+            val uri = Uri.parse(raw)
+            when (uri.scheme?.lowercase()) {
+                // google.navigation:q=HEDEF&mode=d  (sürüş/yürüyüş navigasyonu)
+                "google.navigation" -> {
+                    val fake = Uri.parse("http://nav/?${uri.encodedSchemeSpecificPart}")
+                    val q = fake.getQueryParameter("q")
+                    val mode = when (fake.getQueryParameter("mode")) {
+                        "w" -> "walking"
+                        "b" -> "bicycling"
+                        "l", "r" -> "transit"
+                        else -> "driving"
+                    }
+                    if (!q.isNullOrEmpty()) {
+                        return "https://www.google.com/maps/dir/?api=1" +
+                            "&destination=${Uri.encode(q)}" +
+                            "&travelmode=$mode&dir_action=navigate"
+                    }
+                }
+
+                // comgooglemaps://?daddr=HEDEF&saddr=BASLANGIC  veya  ?q=ARAMA
+                "comgooglemaps" -> {
+                    val daddr = uri.getQueryParameter("daddr")
+                    val saddr = uri.getQueryParameter("saddr")
+                    if (!daddr.isNullOrEmpty()) {
+                        val origin =
+                            if (!saddr.isNullOrEmpty()) "&origin=${Uri.encode(saddr)}" else ""
+                        return "https://www.google.com/maps/dir/?api=1" +
+                            "&destination=${Uri.encode(daddr)}$origin" +
+                            "&travelmode=driving&dir_action=navigate"
+                    }
+                    val q = uri.getQueryParameter("q")
+                    if (!q.isNullOrEmpty()) {
+                        return "https://www.google.com/maps/search/?api=1&query=${Uri.encode(q)}"
+                    }
+                }
+
+                // geo:LAT,LNG?q=...  veya  geo:0,0?q=ARAMA
+                "geo", "maps" -> {
+                    val ssp = uri.schemeSpecificPart ?: return null
+                    val qIndex = ssp.indexOf('?')
+                    val coords = if (qIndex >= 0) ssp.substring(0, qIndex) else ssp
+                    val query = if (qIndex >= 0) {
+                        Uri.parse("http://geo/?${ssp.substring(qIndex + 1)}")
+                            .getQueryParameter("q")
+                    } else null
+                    val target = when {
+                        !query.isNullOrEmpty() -> query
+                        coords.isNotBlank() && coords != "0,0" -> coords
+                        else -> null
+                    }
+                    if (!target.isNullOrEmpty()) {
+                        return "https://www.google.com/maps/search/?api=1&query=${Uri.encode(target)}"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // yoksay
         }
+        return null
     }
 
     private fun hasLocationPermission(): Boolean {
