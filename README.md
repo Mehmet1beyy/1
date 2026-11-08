@@ -1,50 +1,43 @@
-# Haritalar — apk içi sesli navigasyon
+# Haritalar — Google Haritalar (apk içi)
 
-Telefonun GPS'iyle **gerçek sıra-sıra (turn-by-turn) Türkçe sesli navigasyon**
-yapan Android uygulaması. Her şey **apk içinde** çalışır; harici bir uygulamaya
-atlamaz ve **API anahtarı / ücret gerektirmez**.
-
-> Not: 1.x sürümleri Google Haritalar web sitesini WebView'da sarıyordu.
-> Google web sürümünde canlı navigasyon vermediği için 2.0 ile harita motoru
-> açık kaynak yığına taşındı (aşağıya bakın).
+Google Haritalar'ı (`https://www.google.com/maps`) tam ekran bir **WebView**
+içinde açan Android uygulaması. Harita **%100 Google'dır** ve her şey **apk
+içinde** kalır; "Başlat"/navigasyon bağlantıları başka uygulamaya atlamaz,
+eşdeğer bir Google Haritalar yol-tarifi olarak aynı ekranda açılır.
 
 ## İndir / Kur
 
-- Derlenmiş APK: [`Haritalar-2.0.apk`](./Haritalar-2.0.apk) (imzalı release, ~2.6 MB)
+- Derlenmiş APK: [`Haritalar-2.1.apk`](./Haritalar-2.1.apk) (imzalı release, ~2.5 MB)
 - Telefona kopyalayıp dokunun; "bilinmeyen kaynak" iznini onaylayın.
-- İlk açılışta **konum iznini verin** (navigasyon için şart).
-
-## Nasıl kullanılır
-
-1. Üstteki arama kutusuna hedefi yazın (adres veya yer adı) ve listeden seçin.
-2. Alttaki panelde mesafe/varış görünür; **Başlat**'a basın.
-3. Uygulama rotayı çizer, sizi takip eder ve **Türkçe sesli** olarak
-   "200 metre sonra sağa dönün" gibi yönlendirir.
-4. Rotadan saparsanız otomatik **yeniden hesaplar**. **Durdur** ile bitirir.
+- İlk açılışta konum iznini verin (haritanın "Konumum" özelliği için).
 
 ## Özellikler
 
-- Gerçek turn-by-turn navigasyon + Türkçe sesli anons (Android TextToSpeech).
-- Telefon GPS'iyle canlı konum takibi ve haritayı otomatik ortalama (follow).
-- Yer/adres arama (Photon, yedek Nominatim).
-- Rota çizimi, mesafe + tahmini varış saati, manevra ikonları.
-- Rotadan sapınca otomatik yeniden hesaplama.
-- Navigasyon sırasında ekran açık kalır.
-- Dışarı atlama yok; her şey uygulama içinde.
+- Açılışta doğrudan Google Haritalar yüklenir (gerçek Google haritası).
+- Mobil Chrome kullanıcı kimliğiyle tam mobil Google arayüzü.
+- Konum izni → "Konumum", arama ve yol tarifi.
+- **Uygulamadan dışarı atlama yok:** "Başlat" ve navigasyon derin bağlantıları
+  (`intent://`, `geo:`, `google.navigation:`, `comgooglemaps:`) harici
+  uygulamaya devredilmez; Google Haritalar web yol-tarifine çevrilip aynı
+  WebView içinde açılır.
+- "Yol tarifi" gibi yeni pencere açan butonlar ana ekranda açılır.
+- Geri tuşu harita geçmişinde gezinir; `tel:`/`sms:`/`mailto:` ilgili uygulamaya.
 
-## Harita motoru (açık kaynak, ücretsiz)
+## Önemli: canlı sesli navigasyon hakkında
 
-| Katman | Kaynak |
-|--------|--------|
-| Harita + döşemeler | [Leaflet](https://leafletjs.com) + OpenStreetMap |
-| Rota (yol tarifi) | [OSRM](https://project-osrm.org) genel sunucusu |
-| Arama (geocoding) | Photon (komoot) · yedek: Nominatim (OSM) |
-| Sesli yönlendirme | Android TextToSpeech (tr-TR) · yedek: Web Speech |
+Google, **canlı sıra-sıra (turn-by-turn) sesli navigasyonu web/WebView
+sürümünde vermez** — bu yalnızca native Google Haritalar uygulamasının
+özelliğidir. Bu APK Google haritasını ve yol tarifini apk içinde gösterir,
+ama ekranda sesli "sağa dönün" yönlendirmesi yapmaz.
 
-Leaflet uygulama içine gömülüdür (`assets/nav/vendor/`). Harita döşemeleri,
-rota ve arama için internet gerekir. Kullanılan genel servisler (OSRM demo,
-Nominatim, Photon, OSM tile) kişisel kullanım içindir; yoğun/ticari kullanımda
-kendi sunucunuzu veya anahtarlı bir sağlayıcıyı koymanız önerilir.
+Google haritasının **üstüne sesli navigasyon** istenirse, resmi
+**Google Maps Platform (JavaScript API)** ile eklenebilir; bunun için bir
+**Google Cloud API anahtarı** gerekir (ücretsiz aylık 200$ kredi + faturalı
+hesap). Anahtar sağlanırsa harita Google kalır ve navigasyon katmanı eklenir.
+
+> Tam çalışan, ücretsiz ve anahtarsız sesli navigasyon isteyen için
+> açık kaynak (OpenStreetMap) sürümü git geçmişinde `v2.0` etiketli commit'te
+> (`c9ef78a`) bulunur — tek farkı harita görünümünün Google değil OSM olmasıdır.
 
 ## Teknik bilgiler
 
@@ -52,15 +45,11 @@ kendi sunucunuzu veya anahtarlı bir sağlayıcıyı koymanız önerilir.
 |---|---|
 | Paket adı | `com.webview.maps` |
 | Uygulama adı | Haritalar |
-| Sürüm | 2.0 (versionCode 4) |
+| Sürüm | 2.1 (versionCode 5) |
 | minSdk | 24 (Android 7.0) |
 | targetSdk / compileSdk | 35 (Android 15) |
-| Dil | Kotlin 2.0.21 + yerel HTML/JS (assets) |
+| Dil | Kotlin 2.0.21 |
 | AGP / Gradle | 8.7.3 / 8.14.3 |
-
-Uygulama arayüzü `app/src/main/assets/nav/` altındadır
-(`index.html`, `style.css`, `app.js`) ve güvenli bir https origin'den
-(`WebViewAssetLoader`) yüklenir; böylece konum ve ses güvenli bağlamda çalışır.
 
 ## Kaynaktan derleme
 
@@ -68,7 +57,7 @@ Uygulama arayüzü `app/src/main/assets/nav/` altındadır
 ./android-sdk-setup.sh          # SDK: platform-35, build-tools 35.0.0
 ```
 
-Release imzası için bir anahtar gerekir (`keystore.properties` ve `*.keystore`
+Release imzası için anahtar gerekir (`keystore.properties` ve `*.keystore`
 **depoya dahil değildir**; kendiniz üretin):
 
 ```bash
@@ -89,14 +78,6 @@ EOF
 ```
 
 İmzasız hızlı test için: `./gradlew :app:assembleDebug`.
-
-## Sınırlar / notlar
-
-- Sesli navigasyon için cihazda bir Türkçe TTS motoru olmalı (çoğu telefonda
-  hazır gelir; yoksa Ayarlar → Erişilebilirlik → Metin okuma ile eklenebilir).
-- Genel OSRM/Photon sunucuları zaman zaman yavaşlayabilir; bu uygulamanın değil
-  servisin durumuyla ilgilidir.
-- Harita görünümü Google değil OpenStreetMap'tir (ücretsiz ve açık).
 
 ---
 
