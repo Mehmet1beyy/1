@@ -7,7 +7,7 @@ eşdeğer bir Google Haritalar yol-tarifi olarak aynı ekranda açılır.
 
 ## İndir / Kur
 
-- Derlenmiş APK: [`Haritalar-2.1.apk`](./Haritalar-2.1.apk) (imzalı release, ~2.5 MB)
+- Derlenmiş APK: [`Haritalar-2.2.apk`](./Haritalar-2.2.apk) (imzalı release, ~2.5 MB)
 - Telefona kopyalayıp dokunun; "bilinmeyen kaynak" iznini onaylayın.
 - İlk açılışta konum iznini verin (haritanın "Konumum" özelliği için).
 
@@ -45,7 +45,7 @@ hesap). Anahtar sağlanırsa harita Google kalır ve navigasyon katmanı eklenir
 |---|---|
 | Paket adı | `com.webview.maps` |
 | Uygulama adı | Haritalar |
-| Sürüm | 2.1 (versionCode 5) |
+| Sürüm | 2.2 (versionCode 6) |
 | minSdk | 24 (Android 7.0) |
 | targetSdk / compileSdk | 35 (Android 15) |
 | Dil | Kotlin 2.0.21 |

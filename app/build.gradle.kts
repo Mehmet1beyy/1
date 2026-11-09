@@ -22,8 +22,8 @@ android {
         applicationId = "com.webview.maps"
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "2.1"
+        versionCode = 6
+        versionName = "2.2"
     }
 
     signingConfigs {

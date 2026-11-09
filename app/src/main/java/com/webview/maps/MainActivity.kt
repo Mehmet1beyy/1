@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -20,6 +21,9 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +49,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Araç modu: ekran sürekli açık kalsın, tam ekran olsun.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        enableImmersive()
 
         webView = WebView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -142,6 +150,20 @@ class MainActivity : AppCompatActivity() {
         if (!hasLocationPermission()) {
             requestLocationPermission()
         }
+    }
+
+    /** Durum ve gezinme çubuklarını gizleyip tam ekran harita alanı verir. */
+    private fun enableImmersive() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableImmersive()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
