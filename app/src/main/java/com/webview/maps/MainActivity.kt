@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.view.ViewGroup
@@ -183,12 +182,14 @@ class MainActivity : AppCompatActivity() {
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(true)
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            // Google'ın tam donanımlı mobil harita arayüzünü sunması için
-            // güncel bir mobil Chrome kimliği kullanılır.
+            // MASAÜSTÜ sürümü: Google'ın masaüstü harita arayüzünü sunması için
+            // masaüstü Chrome kimliği kullanılır (geniş görünüm + yakınlaştırma açık).
             userAgentString =
-                "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+                "Mozilla/5.0 (X11; Linux x86_64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
+        // Masaüstü sayfa dar ekrana sığsın diye başlangıç ölçeği küçültülür.
+        webView.setInitialScale(60)
     }
 
     private fun isWebUrl(url: String): Boolean =
