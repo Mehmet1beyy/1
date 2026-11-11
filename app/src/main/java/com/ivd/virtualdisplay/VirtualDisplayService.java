@@ -196,6 +196,18 @@ public class VirtualDisplayService extends Service {
         return fps;
     }
 
+    /**
+     * Sanal ekranın (VirtualDisplay) display id'sini döndürür; yoksa -1.
+     * Deney amaçlı: başka bir uygulamayı bu ekranda açmayı denemek için kullanılır.
+     */
+    public int getVirtualDisplayId() {
+        VirtualDisplay vd = virtualDisplay;
+        if (vd != null && vd.getDisplay() != null) {
+            return vd.getDisplay().getDisplayId();
+        }
+        return -1;
+    }
+
     /** Sanal ekrandaki haritayı yakınlaştır (ana iş parçacığında uygulanır). */
     public void zoomIn() {
         mainHandler.post(() -> {

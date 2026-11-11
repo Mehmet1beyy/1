@@ -23,6 +23,12 @@
     <string name="frames_initial">Toplam kare: 0</string>
     <string name="fps_initial">FPS: 0.0</string>
 
+    <string name="launch_title">DENEY: Uygulamayı sanal ekranda aç</string>
+    <string name="launch_hint">Seçilen uygulamayı sanal ekranda açmayı dener. Android genelde buna izin vermez (sistem/root/Shizuku gerekir); amaç gerçek davranışı görmek.</string>
+    <string name="launch_pkg_hint">Paket adı (ör. com.android.settings)</string>
+    <string name="launch_button">Sanal ekranda açmayı dene</string>
+    <string name="launch_result_initial">Henüz denenmedi.</string>
+
     <string name="map_zoom_label">Sanal ekrandaki harita yakınlaştırma</string>
     <string name="zoom_in">Yakınlaştır (+)</string>
     <string name="zoom_out">Uzaklaştır (−)</string>

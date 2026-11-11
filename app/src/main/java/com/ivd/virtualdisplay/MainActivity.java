@@ -2,6 +2,7 @@ package com.ivd.virtualdisplay;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -16,8 +17,10 @@ import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -51,6 +54,9 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
     private Button zoomInButton;
     private Button zoomOutButton;
     private Button recenterButton;
+    private EditText pkgInput;
+    private Button launchButton;
+    private TextView launchResult;
     private ImageView preview;
     private TextView statusText;
     private TextView resolutionText;
@@ -126,6 +132,9 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
         zoomInButton = findViewById(R.id.zoomInButton);
         zoomOutButton = findViewById(R.id.zoomOutButton);
         recenterButton = findViewById(R.id.recenterButton);
+        pkgInput = findViewById(R.id.pkgInput);
+        launchButton = findViewById(R.id.launchButton);
+        launchResult = findViewById(R.id.launchResult);
         preview = findViewById(R.id.preview);
         statusText = findViewById(R.id.statusText);
         resolutionText = findViewById(R.id.resolutionText);
@@ -162,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
                 service.recenter();
             }
         });
+        launchButton.setOnClickListener(v -> onLaunchOnVirtualDisplay());
 
         // Önizlemeye dokunuş -> sanal ekrandaki haritaya aktar.
         preview.setOnTouchListener(this::onPreviewTouch);
@@ -349,6 +359,52 @@ public class MainActivity extends AppCompatActivity implements VirtualDisplaySer
 
     private static float clamp(float value, float lo, float hi) {
         return value < lo ? lo : (value > hi ? hi : value);
+    }
+
+    /**
+     * DENEY: seçilen paketi sanal ekranda (VirtualDisplay) açmayı dener.
+     * Android, özel/trusted olmayan sanal ekrana başka uygulamanın Activity'sini
+     * açmaya genelde izin vermez (sistem/root/Shizuku gerekir). Amaç, cihazdaki
+     * gerçek davranışı ve varsa hata mesajını görmek.
+     */
+    private void onLaunchOnVirtualDisplay() {
+        if (!bound || service == null || !service.isRunning()) {
+            setLaunchResult("Önce \"Sanal Ekranı Başlat\" deyin.");
+            return;
+        }
+        int displayId = service.getVirtualDisplayId();
+        if (displayId < 0) {
+            setLaunchResult("Sanal ekran display id alınamadı (henüz hazır değil).");
+            return;
+        }
+        String pkg = pkgInput.getText() != null ? pkgInput.getText().toString().trim() : "";
+        if (pkg.isEmpty()) {
+            pkg = "com.android.settings"; // her cihazda bulunan güvenli test hedefi
+        }
+        Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+        if (launch == null) {
+            setLaunchResult("Uygulama bulunamadı: " + pkg);
+            return;
+        }
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+        try {
+            ActivityOptions options = ActivityOptions.makeBasic();
+            options.setLaunchDisplayId(displayId);
+            startActivity(launch, options.toBundle());
+            setLaunchResult("Denendi: '" + pkg + "' → display " + displayId
+                    + ". Önizlemede açıldı mı kontrol edin. "
+                    + "(Çoğu cihazda sistem bunu fiziksel ekrana açar ya da engeller.)");
+        } catch (SecurityException e) {
+            setLaunchResult("Reddedildi (SecurityException): " + e.getMessage()
+                    + " — Sanal ekran 'trusted' değil; sistem/root/Shizuku gerekir.");
+        } catch (Exception e) {
+            setLaunchResult("Hata: " + e);
+        }
+    }
+
+    private void setLaunchResult(String text) {
+        launchResult.setText(text);
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show();
     }
 
     // ----- VirtualDisplayService.Listener (ana iş parçacığında çağrılır) -----
